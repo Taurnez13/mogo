@@ -18,7 +18,7 @@ def main():
     OnixImporter(db).import_file(str(SAMPLE))
     settings = dict(DEFAULT_SETTINGS, sender_name="Test Publisher")
     nielsen = m.Recipient(name="Nielsen", addressee_name="Nielsen BookData", include_barcode=True)
-    gardners = m.Recipient(name="Gardners", exclude_digital=True, statuses="02 04")
+    gardners = m.Recipient(name="Gardners", exclude_digital=True, statuses="02 04", include_barcode=False)
     db.add_all([nielsen, gardners]); db.commit()
 
     assert len(feed_products(db, nielsen, "full")) == 4
