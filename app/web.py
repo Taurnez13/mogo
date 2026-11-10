@@ -27,6 +27,8 @@ from .media import harvest_covers, save_cover_upload
 from .connectors import cin7 as cin7c, shopify as shopc
 from .auth import hash_password, verify_password
 from .csvio import import_csv, export_csv, template_csv
+from .delivery import test_connection, deliver, DeliveryError
+from .services import RECIPIENT_PRESETS, build_feed, feed_products
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
@@ -588,41 +590,159 @@ def export_titles_csv(db: Session = Depends(get_session), q: str = "", form: str
 
 @router.get("/export", response_class=HTMLResponse)
 def export_page(request: Request, db: Session = Depends(get_session)):
-    runs = db.scalars(select(m.ExportRun).order_by(m.ExportRun.id.desc()).limit(20)).all()
+    runs = db.scalars(select(m.ExportRun).order_by(m.ExportRun.id.desc()).limit(25)).all()
     recipients = db.scalars(select(m.Recipient).order_by(m.Recipient.name)).all()
-    pending = count(db, product_query(db, missing="unexported"))
-    return render(request, "export.html", runs=runs, recipients=recipients, pending=pending, settings=get_settings(db))
+    pending = {r.id: len(feed_products(db, r, "delta")) for r in recipients}
+    pending_any = count(db, product_query(db, missing="unexported"))
+    return render(request, "export.html", runs=runs, recipients=recipients, pending=pending, pending_any=pending_any,
+                  settings=get_settings(db))
 
 
 @router.post("/export")
-def export_run(request: Request, db: Session = Depends(get_session), mode: str = Form("full"), tag_style: str = Form("reference"),
-               forms: str = Form(""), recipient_id: Optional[str] = Form(None), mark_exported: Optional[str] = Form(None)):
+def export_run(request: Request, db: Session = Depends(get_session), mode: str = Form("full"), tag_style: str = Form(""),
+               forms: str = Form(""), recipient_id: str = Form(""), deliver_now: Optional[str] = Form(None),
+               mark_sent: Optional[str] = Form(None)):
     s = get_settings(db)
-    stmt = select(m.Product).where(m.Product.publishing_status != "11") if False else select(m.Product)
-    if mode == "delta":
-        stmt = product_query(db, missing="unexported")
-    if forms.strip():
-        stmt = stmt.where(m.Product.product_form.in_(forms.split()))
-    prods = db.scalars(stmt.order_by(m.Product.isbn13)).all()
-    ex = OnixExporter(db, s["sender_name"], s["contact_name"], s["contact_email"], s["message_note"],
-                      media_base_url=s["media_base_url"] or None)
-    root = finalise(ex.build_message(prods), tag_style)
-    errs = validate(root)
-    stamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-    fname = f"onix30_{tag_style}_{mode}_{stamp}.xml"
-    (EXPORT_DIR / fname).write_bytes(serialise(root))
-    run = m.ExportRun(mode=mode, product_count=len(prods), filename=fname, valid=not errs,
-                      validation_errors="\n".join(errs[:200]) or None,
-                      recipient_id=int(recipient_id) if recipient_id and recipient_id.isdigit() else None)
-    db.add(run)
-    if mark_exported:
+    r = db.get(m.Recipient, int(recipient_id)) if recipient_id.isdigit() else None
+    if mode == "delta" and not feed_products(db, r, "delta"):
+        flash(request, f"Nothing has changed since {r.name if r else 'the last export'} was last sent, so no file was made.")
+        return RedirectResponse(f"/recipients/{r.id}" if r else "/export", status_code=303)
+    run, prods = build_feed(db, r, mode, s, EXPORT_DIR, tag_style=tag_style or None, forms=forms)
+    msg = f"{run.product_count} products in {run.filename}." + (" Schema valid." if run.valid else f" {len((run.validation_errors or '').splitlines())} validation errors, not delivered.")
+    kind = "ok" if run.valid else "warn"
+    if r and deliver_now and r.delivery != "download":
+        if run.valid:
+            try:
+                run.remote_path = deliver(r, EXPORT_DIR / run.filename)
+                run.delivered, run.delivered_at = True, datetime.utcnow()
+                msg += f" Delivered to {r.name} ({run.remote_path})."
+            except DeliveryError as e:
+                run.delivery_error = str(e); kind = "error"
+                msg += f" Delivery to {r.name} failed: {e}"
+    if mark_sent and run.valid and (run.delivered or not deliver_now):
         now = datetime.utcnow()
-        for p in prods:
-            p.last_exported_at = now
+        if r:
+            r.last_sent_at = now
+        else:
+            for p in prods:
+                p.last_exported_at = now
     db.commit()
-    flash(request, f"Exported {len(prods)} products to {fname}" + (". Schema valid." if not errs else f". {len(errs)} validation errors."),
-          "ok" if not errs else "warn")
+    flash(request, msg, kind)
+    back = request.headers.get("referer") or ""
+    return RedirectResponse(f"/recipients/{r.id}" if (r and "/recipients/" in back) else "/export", status_code=303)
+
+
+@router.post("/export/{run_id}/deliver")
+def export_deliver(request: Request, run_id: int, db: Session = Depends(get_session)):
+    run = db.get(m.ExportRun, run_id)
+    if not run or not run.recipient:
+        raise HTTPException(404)
+    if not run.valid:
+        flash(request, "This file has validation errors and will not be delivered.", "error")
+        return RedirectResponse("/export", status_code=303)
+    try:
+        run.remote_path = deliver(run.recipient, EXPORT_DIR / run.filename)
+        run.delivered, run.delivered_at, run.delivery_error = True, datetime.utcnow(), None
+        run.recipient.last_sent_at = run.delivered_at
+        flash(request, f"Delivered {run.filename} to {run.recipient.name}.")
+    except DeliveryError as e:
+        run.delivery_error = str(e)
+        flash(request, f"Delivery failed: {e}", "error")
+    db.commit()
     return RedirectResponse("/export", status_code=303)
+
+
+# --------------------------------------------------------------------------- #
+# Recipients
+# --------------------------------------------------------------------------- #
+
+RECIPIENT_FIELDS = ("name", "addressee_name", "tag_style", "release", "include_forms", "statuses", "filename_prefix",
+                    "delivery", "host", "username", "remote_dir", "notes")
+
+
+@router.get("/recipients", response_class=HTMLResponse)
+def recipients(request: Request, db: Session = Depends(get_session)):
+    rows = db.scalars(select(m.Recipient).order_by(m.Recipient.name)).all()
+    pending = {r.id: len(feed_products(db, r, "delta")) for r in rows}
+    return render(request, "recipients.html", rows=rows, pending=pending, presets=RECIPIENT_PRESETS)
+
+
+@router.post("/recipients/new")
+def recipient_new(request: Request, db: Session = Depends(get_session), preset: str = Form("download")):
+    data = dict(RECIPIENT_PRESETS.get(preset, RECIPIENT_PRESETS["download"]))
+    base = data["name"]; n = 2
+    while db.scalar(select(m.Recipient).where(m.Recipient.name == data["name"])):
+        data["name"] = f"{base} {n}"; n += 1
+    r = m.Recipient(**data)
+    db.add(r); db.commit()
+    return RedirectResponse(f"/recipients/{r.id}", status_code=303)
+
+
+@router.get("/recipients/{rid}", response_class=HTMLResponse)
+def recipient_detail(request: Request, rid: int, db: Session = Depends(get_session)):
+    r = db.get(m.Recipient, rid)
+    if not r:
+        raise HTTPException(404)
+    return render(request, "recipient_detail.html", r=r, pending=len(feed_products(db, r, "delta")),
+                  total=len(feed_products(db, r, "full")))
+
+
+@router.post("/recipients/{rid}")
+async def recipient_save(request: Request, rid: int, db: Session = Depends(get_session)):
+    r = db.get(m.Recipient, rid)
+    if not r:
+        raise HTTPException(404)
+    f = await request.form()
+    for k in RECIPIENT_FIELDS:
+        if k in f:
+            setattr(r, k, (f.get(k) or "").strip() or None)
+    r.name = r.name or "Unnamed recipient"
+    r.tag_style = r.tag_style or "reference"; r.release = r.release or "3.0"; r.delivery = r.delivery or "download"
+    port = (f.get("port") or "").strip()
+    r.port = int(port) if port.isdigit() else None
+    r.exclude_digital = bool(f.get("exclude_digital"))
+    r.include_barcode = bool(f.get("include_barcode"))
+    pw = f.get("password") or ""
+    if pw and pw != "••••••••":
+        r.password = pw
+    key = (f.get("private_key") or "").strip()
+    if key and key != "(key stored)":
+        r.private_key = key
+    elif not key:
+        r.private_key = None
+    if f.get("reset_last_sent"):
+        r.last_sent_at = None
+    db.commit()
+    flash(request, "Recipient saved.")
+    return RedirectResponse(f"/recipients/{rid}", status_code=303)
+
+
+@router.post("/recipients/{rid}/test")
+def recipient_test(request: Request, rid: int, db: Session = Depends(get_session)):
+    r = db.get(m.Recipient, rid)
+    if not r:
+        raise HTTPException(404)
+    try:
+        result = test_connection(r); kind = "ok"
+    except DeliveryError as e:
+        result = str(e); kind = "error"
+    except Exception as e:  # unexpected, still show it
+        result = f"Unexpected error: {e}"; kind = "error"
+    r.last_tested_at, r.last_test_result = datetime.utcnow(), result
+    db.commit()
+    flash(request, result, kind)
+    return RedirectResponse(f"/recipients/{rid}", status_code=303)
+
+
+@router.post("/recipients/{rid}/delete")
+def recipient_delete(request: Request, rid: int, db: Session = Depends(get_session)):
+    r = db.get(m.Recipient, rid)
+    if r:
+        for run in r.runs:
+            run.recipient_id = None
+        db.delete(r); db.commit()
+        flash(request, f"Removed {r.name}. Its past export files are kept.")
+    return RedirectResponse("/recipients", status_code=303)
 
 
 @router.get("/export/download/{fname}")

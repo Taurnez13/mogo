@@ -149,3 +149,66 @@ def set_rrp(db: Session, p: m.Product, amount: Optional[Decimal], standard_rated
     sd.prices.append(m.Price(price_type="02", amount=inc, currency=cur, tax_rate_code=code,
                              tax_rate_percent=rate, taxable_amount=exc, tax_amount=tax))
     sd.prices.append(m.Price(price_type="01", amount=exc, currency=cur))
+
+
+# --------------------------------------------------------------------------- #
+# Recipient profiles and feed building
+# --------------------------------------------------------------------------- #
+
+RECIPIENT_PRESETS = {
+    "nielsen": dict(name="Nielsen BookData", addressee_name="Nielsen BookData", tag_style="reference", delivery="sftp",
+                    include_barcode=True, port=22,
+                    notes="Nielsen's data-provider team supplies the SFTP host, username and password when you register "
+                          "as a publisher data provider. Send a full feed first, then deltas."),
+    "gardners": dict(name="Gardners", addressee_name="Gardners Books", tag_style="reference", delivery="sftp",
+                     include_barcode=True, exclude_digital=True, port=22,
+                     notes="Physical products only. Credentials come from Gardners' publisher services team."),
+    "ingram": dict(name="Ingram", addressee_name="Ingram Content Group", tag_style="reference", delivery="sftp",
+                   include_barcode=True, port=22, notes="Credentials from your Ingram Publisher Services contact."),
+    "bowker": dict(name="Bowker (Books In Print)", addressee_name="Bowker", tag_style="reference", delivery="ftp",
+                   include_barcode=True, port=21, notes="US ISBN agency database. Credentials from Bowker."),
+    "download": dict(name="Manual download", tag_style="reference", delivery="download",
+                     notes="Generate and download the file yourself, then upload it wherever it is needed."),
+}
+
+
+def feed_products(db: Session, r, mode: str):
+    """Products that belong in this recipient's feed. Delta = changed since the recipient was last sent."""
+    stmt = select(m.Product)
+    if r is not None:
+        if r.include_forms:
+            stmt = stmt.where(m.Product.product_form.in_(r.include_forms.split()))
+        if r.exclude_digital:
+            stmt = stmt.where(~m.Product.product_form.in_(["ED", "EA", "EB", "EC", "EH", "AJ", "AN", "AL"]))
+        if r.statuses:
+            stmt = stmt.where(m.Product.publishing_status.in_(r.statuses.split()))
+        if mode == "delta" and r.last_sent_at:
+            stmt = stmt.where(m.Product.updated_at > r.last_sent_at)
+    elif mode == "delta":
+        stmt = product_query(db, missing="unexported")
+    return db.scalars(stmt.order_by(m.Product.isbn13)).all()
+
+
+def build_feed(db: Session, r, mode: str, settings: dict, export_dir, tag_style: Optional[str] = None, forms: str = ""):
+    """Generate, validate and save a feed. Returns (ExportRun, products). Does not deliver."""
+    from .onix.exporter import OnixExporter, finalise, serialise, validate
+    style = tag_style or (r.tag_style if r else "reference")
+    prods = feed_products(db, r, mode)
+    if forms.strip():
+        allowed = set(forms.split())
+        prods = [p for p in prods if p.product_form in allowed]
+    ex = OnixExporter(db, settings["sender_name"], settings["contact_name"], settings["contact_email"], settings["message_note"],
+                      default_currency=settings.get("currency") or "GBP", media_base_url=settings["media_base_url"] or None,
+                      addressee_name=r.addressee_name if r else None, include_barcode=bool(r.include_barcode) if r else False)
+    root = finalise(ex.build_message(prods, release=(r.release if r else "3.0")), style)
+    errs = validate(root)
+    stamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    prefix = (r.filename_prefix if r and r.filename_prefix else "onix30")
+    slug = "".join(ch if ch.isalnum() else "_" for ch in prefix)
+    fname = f"{slug}_{mode}_{stamp}.xml"
+    (export_dir / fname).write_bytes(serialise(root))
+    run = m.ExportRun(mode=mode, product_count=len(prods), filename=fname, valid=not errs,
+                      validation_errors="\n".join(errs[:200]) or None, recipient_id=r.id if r else None)
+    db.add(run)
+    db.flush()
+    return run, prods

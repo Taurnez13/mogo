@@ -3,26 +3,45 @@
 {% block content %}
 <h1>ONIX export</h1>
 <div class="cols">
-<form method="post">
-  <div class="row c2">
-    <div class="field"><label>Scope</label><select name="mode"><option value="full">Full catalogue</option><option value="delta">Changed since last export ({{ pending }})</option></select></div>
-    <div class="field"><label>Tag style</label><select name="tag_style"><option value="reference">Reference tags (Nielsen, most recipients)</option><option value="short">Short tags (as Stison sent)</option></select></div>
-  </div>
-  <div class="field"><label>Only these formats <span class="muted">(ONIX codes separated by spaces; leave blank for all)</span></label><input type="text" name="forms" placeholder="BC BB ED"></div>
-  <div class="check field"><input type="checkbox" name="mark_exported" id="mk" value="1" checked><label for="mk" style="margin:0">Mark these records as sent, so the next "changed since last export" starts from now</label></div>
-  <div class="actions"><button class="btn primary" data-working="Generating and validating…">Generate ONIX 3.0</button><a class="btn quiet" href="/export/titles.csv">Download titles as CSV</a></div>
-  <p class="help" style="margin-top:14px">Every export is validated against the EDItEUR ONIX 3.0 schema before it is saved. Sender: <b>{{ settings.sender_name }}</b>{% if settings.contact_email %}, {{ settings.contact_email }}{% endif %}. Change this in Settings.
-  {% if not settings.media_base_url %}<br><b>Cover URLs</b> still point at the host they were imported from. Set a media base URL in Settings once this app is hosted so recipients fetch jackets from you.{% endif %}</p>
-</form>
 <section>
-  <h2>Previous exports</h2>
-  {% if runs %}
-  <div class="scroll"><table class="ledger"><thead><tr><th>When</th><th>Scope</th><th>Products</th><th>Schema</th><th></th></tr></thead><tbody>
-  {% for r in runs %}<tr><td class="small">{{ r.run_at.strftime('%d %b %Y %H:%M') }}</td><td class="small">{{ r.mode }}</td><td>{{ r.product_count }}</td>
-  <td class="small">{% if r.valid %}<span class="status active">valid</span>{% else %}<details><summary class="status withdrawn">errors</summary><pre class="xml">{{ r.validation_errors }}</pre></details>{% endif %}</td>
-  <td><a class="btn quiet sm" href="/export/download/{{ r.filename }}">Download</a></td></tr>{% endfor %}
+  <h2>Send to a recipient</h2>
+  {% if recipients %}
+  <div class="scroll"><table class="ledger"><thead><tr><th>Recipient</th><th>Changed since last sent</th><th>Last sent</th><th></th></tr></thead><tbody>
+  {% for r in recipients %}
+  <tr><td><a class="t" href="/recipients/{{ r.id }}">{{ r.name }}</a><div class="sub">{{ r.delivery.upper() if r.delivery != 'download' else 'manual download' }}, {{ r.tag_style }} tags</div></td>
+  <td>{{ pending[r.id] }}</td>
+  <td class="small">{{ r.last_sent_at.strftime('%d %b %Y') if r.last_sent_at else 'never' }}</td>
+  <td style="white-space:nowrap"><form method="post" action="/export" class="inline"><input type="hidden" name="recipient_id" value="{{ r.id }}"><input type="hidden" name="mode" value="delta"><input type="hidden" name="mark_sent" value="1"><input type="hidden" name="deliver_now" value="{{ '1' if r.delivery != 'download' else '' }}"><button class="btn sm" data-working="Working…" {{ 'disabled' if pending[r.id] == 0 }}>{{ 'Send delta' if r.delivery != 'download' else 'Generate delta' }}</button></form>
+  <form method="post" action="/export" class="inline"><input type="hidden" name="recipient_id" value="{{ r.id }}"><input type="hidden" name="mode" value="full"><input type="hidden" name="mark_sent" value="1"><input type="hidden" name="deliver_now" value="{{ '1' if r.delivery != 'download' else '' }}"><button class="btn quiet sm" data-working="Working…">{{ 'Send full' if r.delivery != 'download' else 'Generate full' }}</button></form></td></tr>
+  {% endfor %}
   </tbody></table></div>
-  {% else %}<div class="empty">No exports yet.</div>{% endif %}
+  <p class="help">Every file is validated against the EDItEUR ONIX 3.0 schema; a file with errors is saved for inspection but never sent. <a href="/recipients">Manage recipients</a>.</p>
+  {% else %}
+  <div class="empty">No recipients yet. <a href="/recipients">Add Nielsen or another recipient</a> to send feeds directly over SFTP.</div>
+  {% endif %}
+
+  <h2>One-off file</h2>
+  <form method="post">
+    <div class="row c2">
+      <div class="field"><label>Scope</label><select name="mode"><option value="full">Full catalogue</option><option value="delta">Changed since last one-off export ({{ pending_any }})</option></select></div>
+      <div class="field"><label>Tag style</label><select name="tag_style"><option value="reference">Reference tags</option><option value="short">Short tags</option></select></div>
+    </div>
+    <div class="field"><label>Only these formats <span class="muted">(ONIX codes separated by spaces; leave blank for all)</span></label><input type="text" name="forms" placeholder="BC BB ED"></div>
+    <div class="check field"><input type="checkbox" name="mark_sent" id="mk" value="1" checked><label for="mk" style="margin:0">Mark these records as sent, so the next "changed since" starts from now</label></div>
+    <div class="actions"><button class="btn" data-working="Generating and validating…">Generate ONIX 3.0</button><a class="btn quiet" href="/export/titles.csv">Download titles as CSV</a></div>
+  </form>
+  <p class="help" style="margin-top:14px">Sender in the ONIX header: <b>{{ settings.sender_name }}</b>{% if settings.contact_email %}, {{ settings.contact_email }}{% endif %}. Change this in Settings.
+  {% if not settings.media_base_url %}<br><b>Cover URLs</b> still point at the host they were imported from. Set a media base URL in Settings once this app is hosted so recipients fetch jackets from you.{% endif %}</p>
+</section>
+<section>
+  <h2>Recent files</h2>
+  {% if runs %}
+  <div class="scroll"><table class="ledger"><thead><tr><th>When</th><th>Recipient</th><th>Scope</th><th>Products</th><th>Status</th><th></th></tr></thead><tbody>
+  {% for r in runs %}<tr><td class="small" style="white-space:nowrap">{{ r.run_at.strftime('%d %b %H:%M') }}</td><td class="small">{{ r.recipient.name if r.recipient else 'one-off' }}</td><td class="small">{{ r.mode }}</td><td>{{ r.product_count }}</td>
+  <td class="small">{% if not r.valid %}<details><summary class="status withdrawn">invalid</summary><pre class="xml">{{ r.validation_errors }}</pre></details>{% elif r.delivered %}<span class="status active">sent</span>{% elif r.delivery_error %}<span class="status withdrawn">send failed</span> {{ r.delivery_error }}{% else %}<span class="status active">valid</span>{% endif %}</td>
+  <td style="white-space:nowrap"><a class="btn quiet sm" href="/export/download/{{ r.filename }}">Download</a>{% if r.recipient and r.recipient.delivery != 'download' and r.valid and not r.delivered %} <form method="post" action="/export/{{ r.id }}/deliver" class="inline"><button class="btn sm" data-working="Sending…">Send</button></form>{% endif %}</td></tr>{% endfor %}
+  </tbody></table></div>
+  {% else %}<div class="empty">No files yet.</div>{% endif %}
 </section>
 </div>
 {% endblock %}

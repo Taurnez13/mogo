@@ -529,21 +529,33 @@ class ExternalLink(Base):
 
 
 class Recipient(Base):
-    """An ONIX feed recipient (Nielsen, Gardners, Ingram...)."""
+    """An ONIX feed recipient (Nielsen, Gardners, Ingram...) with its own profile and delivery."""
     __tablename__ = "recipient"
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(100), unique=True)
+    addressee_name: Mapped[Optional[str]] = mapped_column(String(200))  # ONIX <AddresseeName>
+    # ---- profile
     tag_style: Mapped[str] = mapped_column(String(10), default="reference")  # 'reference' | 'short'
     release: Mapped[str] = mapped_column(String(4), default="3.0")
     include_forms: Mapped[Optional[str]] = mapped_column(String(100))  # e.g. "BC BB ED" or null = all
     exclude_digital: Mapped[bool] = mapped_column(Boolean, default=False)
-    delivery: Mapped[str] = mapped_column(String(10), default="download")  # download | sftp | ftp
+    include_barcode: Mapped[bool] = mapped_column(Boolean, default=True)   # <Barcode> composite
+    statuses: Mapped[Optional[str]] = mapped_column(String(100))  # publishing statuses to send, e.g. "02 04 07"; null = all
+    filename_prefix: Mapped[Optional[str]] = mapped_column(String(60))
+    # ---- delivery
+    delivery: Mapped[str] = mapped_column(String(10), default="download")  # download | sftp | ftp | ftps
     host: Mapped[Optional[str]] = mapped_column(String(200))
     port: Mapped[Optional[int]] = mapped_column(Integer)
     username: Mapped[Optional[str]] = mapped_column(String(100))
     password: Mapped[Optional[str]] = mapped_column(String(200))
+    private_key: Mapped[Optional[str]] = mapped_column(Text)  # OpenSSH private key (SFTP), optional
     remote_dir: Mapped[Optional[str]] = mapped_column(String(300))
+    # ---- state
+    last_sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    last_tested_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    last_test_result: Mapped[Optional[str]] = mapped_column(Text)
     notes: Mapped[Optional[str]] = mapped_column(Text)
+    runs: Mapped[List["ExportRun"]] = relationship(back_populates="recipient", order_by="ExportRun.id.desc()")
 
 
 class ExportRun(Base):
@@ -557,6 +569,10 @@ class ExportRun(Base):
     valid: Mapped[Optional[bool]] = mapped_column(Boolean)
     validation_errors: Mapped[Optional[str]] = mapped_column(Text)
     delivered: Mapped[bool] = mapped_column(Boolean, default=False)
+    delivered_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    delivery_error: Mapped[Optional[str]] = mapped_column(Text)
+    remote_path: Mapped[Optional[str]] = mapped_column(String(400))
+    recipient: Mapped[Optional["Recipient"]] = relationship(back_populates="runs")
 
 
 class SyncLog(Base):

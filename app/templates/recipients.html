@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Recipients | MOGO{% endblock %}
+{% block content %}
+<div class="topbar"><h1>Recipients <span class="muted" style="font-size:18px">{{ rows|length }}</span></h1></div>
+<p class="help">Each recipient has its own profile (tag style, which formats and statuses it receives) and its own delivery
+(SFTP, FTP or manual download). Deltas are tracked per recipient, so Nielsen and Gardners can be sent on different days.</p>
+{% if rows %}
+<div class="scroll"><table class="ledger"><thead><tr><th>Recipient</th><th>Profile</th><th>Delivery</th><th>Last sent</th><th>Changed since</th></tr></thead><tbody>
+{% for r in rows %}
+<tr><td><a class="t" href="/recipients/{{ r.id }}">{{ r.name }}</a>{% if r.addressee_name and r.addressee_name != r.name %}<div class="sub">{{ r.addressee_name }}</div>{% endif %}</td>
+<td class="small">ONIX {{ r.release }} {{ r.tag_style }}{% if r.exclude_digital %}, print only{% endif %}{% if r.include_forms %}, {{ r.include_forms }}{% endif %}</td>
+<td class="small">{{ r.delivery.upper() if r.delivery != 'download' else 'Manual download' }}{% if r.host %} <span class="muted">{{ r.host }}</span>{% endif %}</td>
+<td class="small">{{ r.last_sent_at.strftime('%d %b %Y %H:%M') if r.last_sent_at else 'never' }}</td>
+<td>{{ pending[r.id] }}</td></tr>
+{% endfor %}
+</tbody></table></div>
+{% else %}<div class="empty">No recipients yet. Add one below; Nielsen is the usual first.</div>{% endif %}
+<h2>Add a recipient</h2>
+<form method="post" action="/recipients/new" class="row c3" style="align-items:end;max-width:720px">
+  <div class="field" style="grid-column: span 2"><label>Start from</label><select name="preset">{% for key, p in presets.items() %}<option value="{{ key }}">{{ p.name }}</option>{% endfor %}</select></div>
+  <div><button class="btn primary">Add recipient</button></div>
+</form>
+<p class="help">A preset only fills in sensible defaults. The host, username and password come from the recipient's onboarding email and are entered on the next page.</p>
+{% endblock %}

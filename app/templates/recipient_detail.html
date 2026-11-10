@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}{{ r.name }} | MOGO{% endblock %}
+{% block content %}
+<p class="small"><a href="/recipients">Recipients</a> / {{ r.name }}</p>
+<h1>{{ r.name }}</h1>
+<div class="cols">
+<form method="post">
+  <h2>Profile</h2>
+  <div class="row c2">
+    <div class="field"><label>Name (shown here)</label><input type="text" name="name" value="{{ r.name }}" required></div>
+    <div class="field"><label>Addressee name <span class="muted">(ONIX header)</span></label><input type="text" name="addressee_name" value="{{ r.addressee_name or '' }}"></div>
+  </div>
+  <div class="row c3">
+    <div class="field"><label>Tag style</label><select name="tag_style"><option value="reference" {{ 'selected' if r.tag_style == 'reference' }}>Reference tags</option><option value="short" {{ 'selected' if r.tag_style == 'short' }}>Short tags</option></select></div>
+    <div class="field"><label>ONIX release</label><select name="release"><option value="3.0" {{ 'selected' if r.release == '3.0' }}>3.0</option><option value="3.1" {{ 'selected' if r.release == '3.1' }}>3.1</option></select></div>
+    <div class="field"><label>File name prefix</label><input type="text" name="filename_prefix" value="{{ r.filename_prefix or '' }}" placeholder="onix30"></div>
+  </div>
+  <div class="row c2">
+    <div class="field"><label>Only these formats <span class="muted">(ONIX codes, space separated; blank for all)</span></label><input type="text" name="include_forms" value="{{ r.include_forms or '' }}" placeholder="BC BB ED"></div>
+    <div class="field"><label>Only these statuses <span class="muted">(blank for all)</span></label><input type="text" name="statuses" value="{{ r.statuses or '' }}" placeholder="02 04 07"></div>
+  </div>
+  <div class="check field"><input type="checkbox" name="exclude_digital" id="xd" value="1" {{ 'checked' if r.exclude_digital }}><label for="xd" style="margin:0">Print and physical products only (no ebooks or audio downloads)</label></div>
+  <div class="check field"><input type="checkbox" name="include_barcode" id="bc" value="1" {{ 'checked' if r.include_barcode }}><label for="bc" style="margin:0">Include the Barcode composite (GTIN-13 on back cover) for physical products</label></div>
+
+  <h2>Delivery</h2>
+  <div class="row c3">
+    <div class="field"><label>Method</label><select name="delivery">{% for v, l in [('sftp','SFTP'),('ftps','FTPS (FTP over TLS)'),('ftp','FTP'),('download','Manual download')] %}<option value="{{ v }}" {{ 'selected' if r.delivery == v }}>{{ l }}</option>{% endfor %}</select></div>
+    <div class="field" style="grid-column: span 2"><label>Host</label><input type="text" name="host" value="{{ r.host or '' }}" placeholder="sftp.example.com" class="mono"></div>
+  </div>
+  <div class="row c3">
+    <div class="field"><label>Port</label><input type="text" name="port" value="{{ r.port or '' }}" inputmode="numeric" placeholder="22" class="mono"></div>
+    <div class="field"><label>Username</label><input type="text" name="username" value="{{ r.username or '' }}" class="mono" autocomplete="off"></div>
+    <div class="field"><label>Password <span class="muted">(or key passphrase)</span></label><input type="password" name="password" value="{{ '••••••••' if r.password }}" class="mono" autocomplete="new-password"></div>
+  </div>
+  <div class="field"><label>Remote folder</label><input type="text" name="remote_dir" value="{{ r.remote_dir or '' }}" placeholder="/incoming" class="mono"></div>
+  <div class="field"><label>SFTP private key <span class="muted">(optional, OpenSSH format; leave blank to use the password)</span></label><textarea name="private_key" class="mono" style="min-height:70px">{{ '(key stored)' if r.private_key }}</textarea></div>
+  <div class="field"><label>Notes</label><textarea name="notes" style="min-height:60px">{{ r.notes or '' }}</textarea></div>
+  <div class="check field"><input type="checkbox" name="reset_last_sent" id="rls" value="1"><label for="rls" style="margin:0">Forget the last-sent date, so the next delta sends everything</label></div>
+  <div class="actions"><button class="btn primary">Save recipient</button></div>
+</form>
+<section>
+  <h2>Status</h2>
+  <dl class="kv">
+    <dt>Titles in feed</dt><dd>{{ total }}</dd>
+    <dt>Changed since last sent</dt><dd>{{ pending }}</dd>
+    <dt>Last sent</dt><dd>{{ r.last_sent_at.strftime('%d %b %Y %H:%M') if r.last_sent_at else 'never' }}</dd>
+    <dt>Last connection test</dt><dd>{% if r.last_tested_at %}{{ r.last_tested_at.strftime('%d %b %Y %H:%M') }}<div class="small">{{ r.last_test_result }}</div>{% else %}not tested{% endif %}</dd>
+  </dl>
+  {% if r.delivery != 'download' %}
+  <form method="post" action="/recipients/{{ r.id }}/test" style="margin-top:12px"><button class="btn" data-working="Connecting…">Test connection</button></form>
+  <p class="help">Connects with the saved details and lists the remote folder. Save first if you have just changed them.</p>
+  {% endif %}
+  <h2>Send a feed</h2>
+  <form method="post" action="/export" class="row c2" style="align-items:end">
+    <input type="hidden" name="recipient_id" value="{{ r.id }}">
+    <div class="field"><label>Scope</label><select name="mode"><option value="delta">Changed since last sent ({{ pending }})</option><option value="full">Full feed ({{ total }})</option></select></div>
+    <div><button class="btn primary" name="deliver_now" value="{{ '1' if r.delivery != 'download' else '' }}" data-working="Generating, validating and sending…">{{ 'Generate and send' if r.delivery != 'download' else 'Generate file' }}</button></div>
+    <input type="hidden" name="mark_sent" value="1">
+  </form>
+  <p class="help">The file is validated against the ONIX schema before anything is sent. On success the last-sent date moves to now.</p>
+  <h2>Recent files</h2>
+  {% if r.runs %}
+  <div class="scroll"><table class="ledger"><thead><tr><th>When</th><th>Scope</th><th>Products</th><th>Status</th><th></th></tr></thead><tbody>
+  {% for run in r.runs[:10] %}<tr><td class="small" style="white-space:nowrap">{{ run.run_at.strftime('%d %b %H:%M') }}</td><td class="small">{{ run.mode }}</td><td>{{ run.product_count }}</td>
+  <td class="small">{% if run.delivered %}<span class="status active">sent {{ run.delivered_at.strftime('%H:%M') }}</span>{% elif run.delivery_error %}<span class="status withdrawn">failed</span> {{ run.delivery_error }}{% elif not run.valid %}<span class="status withdrawn">invalid</span>{% else %}not sent{% endif %}</td>
+  <td style="white-space:nowrap"><a class="btn quiet sm" href="/export/download/{{ run.filename }}">Download</a>{% if r.delivery != 'download' and run.valid and not run.delivered %} <form method="post" action="/export/{{ run.id }}/deliver" class="inline"><button class="btn sm" data-working="Sending…">Send</button></form>{% endif %}</td></tr>{% endfor %}
+  </tbody></table></div>
+  {% else %}<div class="empty">Nothing generated for this recipient yet.</div>{% endif %}
+  <details style="margin-top:30px"><summary class="small muted">Danger zone</summary>
+    <form method="post" action="/recipients/{{ r.id }}/delete" onsubmit="return confirm('Remove this recipient? Past export files are kept.')"><button class="btn danger sm">Remove recipient</button></form>
+  </details>
+</section>
+</div>
+{% endblock %}

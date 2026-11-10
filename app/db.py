@@ -35,6 +35,26 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False
 
 def init_db() -> None:
     Base.metadata.create_all(engine)
+    _add_missing_columns()
+
+
+def _add_missing_columns() -> None:
+    """Add columns that exist in the models but not yet in the database (simple forward-only migration)."""
+    from sqlalchemy import inspect, text
+    insp = inspect(engine)
+    with engine.begin() as conn:
+        for table in Base.metadata.sorted_tables:
+            if not insp.has_table(table.name):
+                continue
+            existing = {c["name"] for c in insp.get_columns(table.name)}
+            for col in table.columns:
+                if col.name in existing:
+                    continue
+                ddl = f'ALTER TABLE "{table.name}" ADD COLUMN "{col.name}" {col.type.compile(engine.dialect)}'
+                if col.default is not None and getattr(col.default, "is_scalar", False):
+                    v = col.default.arg
+                    ddl += " DEFAULT " + (("1" if v else "0") if isinstance(v, bool) else repr(v))
+                conn.execute(text(ddl))
 
 
 def get_session():
