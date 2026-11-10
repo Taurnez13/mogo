@@ -30,7 +30,7 @@ def harvest_covers(db: Session, limit: int = 2000, timeout: float = 20.0) -> dic
     res = {"downloaded": 0, "skipped": 0, "failed": 0, "errors": []}
     rows = db.scalars(select(m.SupportingResource).where(m.SupportingResource.content_type == "01",
                                                          m.SupportingResource.remote_url.isnot(None))).all()
-    with httpx.Client(timeout=timeout, follow_redirects=True, headers={"User-Agent": "Taurnez/1.0"}) as client:
+    with httpx.Client(timeout=timeout, follow_redirects=True, headers={"User-Agent": "MOGO/1.0"}) as client:
         for sr in rows[:limit]:
             if sr.local_path and (MEDIA_DIR / sr.local_path).exists():
                 res["skipped"] += 1

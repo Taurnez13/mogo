@@ -1,5 +1,5 @@
 """
-Taurnez — title metadata database.
+MOGO — title metadata database.
 
 Design: a normalised relational model that mirrors the ONIX 3.0 block structure
 closely enough to round-trip a full publisher feed without loss, while keeping

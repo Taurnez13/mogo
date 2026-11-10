@@ -1,8 +1,8 @@
-# Taurnez
+# MOGO
 
 **Self-hosted title metadata management and ONIX 3.0 feeds for small publishers.**
 
-Taurnez is the system of record for a publisher's catalogue: one record per product (print,
+MOGO is the system of record for a publisher's catalogue: one record per product (print,
 ebook, audio, non-book), with contributors, subjects, prices, descriptions, covers and
 related-format links. It imports ONIX from the system you use now, lets your team edit titles in a
 browser, and exports schema-valid ONIX 3.0 to Nielsen, Bowker, Gardners, Ingram or anyone else —
@@ -12,7 +12,7 @@ It is built for presses with one to twenty staff: a single Python process, a SQL
 JavaScript build, no external services. It runs on a laptop, a £5/month VPS, or in Docker, and the
 whole thing backs up by copying one folder.
 
-![Taurnez title list](docs/screenshot-titles.png)
+![MOGO title list](docs/screenshot-titles.png)
 
 ## Features
 
@@ -42,8 +42,8 @@ whole thing backs up by copying one folder.
 Requires Python 3.11+.
 
 ```bash
-git clone https://github.com/<you>/taurnez.git
-cd taurnez
+git clone https://github.com/<you>/mogo.git
+cd mogo
 ./run.sh
 ```
 
@@ -53,11 +53,11 @@ Open http://localhost:8000, complete the two-minute setup page, then import an O
 Docker:
 
 ```bash
-docker build -t taurnez .
-docker run -d -p 8000:8000 -v $PWD/data:/srv/data -e SECRET_KEY=$(openssl rand -hex 32) taurnez
+docker build -t mogo .
+docker run -d -p 8000:8000 -v $PWD/data:/srv/data -e SECRET_KEY=$(openssl rand -hex 32) mogo
 ```
 
-Environment variables: `SECRET_KEY` (set it in production), `TAURNEZ_DATA_DIR` (default `./data`),
+Environment variables: `SECRET_KEY` (set it in production), `MOGO_DATA_DIR` (default `./data`),
 `DATABASE_URL` (default SQLite; a Postgres URL works unchanged).
 
 ## Going live
@@ -103,5 +103,5 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Licence
 
-MIT. Taurnez was built by Andrew Cornellius at a small UK publishing house to replace a commercial title
+MIT. MOGO was built by Taurnez at a small UK publishing house to replace a commercial title
 database; it is released so that other small publishers don't have to pay for one.

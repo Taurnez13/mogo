@@ -12,7 +12,7 @@ from .web import router as web_router
 from .api import router as api_router
 from .auth import AuthMiddleware
 
-app = FastAPI(title="Taurnez", docs_url="/api/docs", redoc_url=None)
+app = FastAPI(title="MOGO", docs_url="/api/docs", redoc_url=None)
 app.add_middleware(AuthMiddleware)
 app.add_middleware(SessionMiddleware, secret_key=os.environ.get("SECRET_KEY", "change-me-in-production"), max_age=14 * 24 * 3600)
 

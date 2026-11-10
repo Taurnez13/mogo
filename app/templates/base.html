@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{% block title %}Taurnez{% endblock %}</title>
+<title>{% block title %}MOGO{% endblock %}</title>
 <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
 <div class="shell">
   <aside class="side">
     <header>
-      <p class="brand">Taur<span>·</span>nez</p>
+      <p class="brand">MO<span>·</span>GO</p>
       <div class="brand-sub">{{ org_name or "Title metadata &amp; ONIX" }}</div>
     </header>
     {% set path = request.url.path %}
@@ -34,7 +34,7 @@
   <main class="main">
     {% if flash %}<div class="flash {{ flash.kind }}" role="status">{{ flash.msg }}</div>{% endif %}
     {% block content %}{% endblock %}
-    <footer class="foot">Taurnez, open-source title metadata and ONIX 3.0. MIT licence.</footer>
+    <footer class="foot">MOGO, open-source title metadata and ONIX 3.0. MIT licence.</footer>
   </main>
 </div>
 <script>

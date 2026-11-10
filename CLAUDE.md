@@ -1,6 +1,6 @@
-# Taurnez — notes for AI coding agents
+# MOGO — notes for AI coding agents
 
-Taurnez is a self-hosted title-metadata and ONIX 3.0 app for small publishers. Python/FastAPI,
+MOGO is a self-hosted title-metadata and ONIX 3.0 app for small publishers. Python/FastAPI,
 SQLAlchemy, SQLite, Jinja2, one CSS file, no JavaScript framework. Keep it that way.
 
 ## Rules

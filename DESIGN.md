@@ -1,4 +1,4 @@
-# Taurnez design direction
+# MOGO design direction
 
 Reading this as: an internal catalogue tool for publishing staff (editors, production, finance),
 in a paper-and-ink ledger language, dial ENERGY 1 / RHYTHM 1 / MOTION 1.

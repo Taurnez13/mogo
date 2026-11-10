@@ -1,6 +1,6 @@
 # Contributing
 
-Taurnez is small on purpose. Before adding a dependency or a JavaScript build step, ask whether
+MOGO is small on purpose. Before adding a dependency or a JavaScript build step, ask whether
 a publisher with no IT department could still run it from `./run.sh`.
 
 ## Dev setup

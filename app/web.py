@@ -577,7 +577,7 @@ async def import_csv_run(request: Request, db: Session = Depends(get_session), f
 
 @router.get("/import/template.csv")
 def import_template():
-    return Response(template_csv(), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=taurnez_template.csv"})
+    return Response(template_csv(), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=mogo_template.csv"})
 
 
 @router.get("/export/titles.csv")
