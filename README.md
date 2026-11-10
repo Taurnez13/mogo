@@ -32,8 +32,14 @@ whole thing backs up by copying one folder.
   no longer depends on a previous vendor's server.
 * **Cin7 Core and Shopify connectors** — match by barcode = ISBN; pull stock/price snapshots; push
   title, description and RRP (dry-run by default; new Shopify products are created as drafts).
-* **Users and API key** — simple login with admin/editor roles; read-only JSON API for your
-  website, reporting or automation.
+* **Subject picker** — on each title, search Thema, BIC or BISAC by words or by the start of a code;
+  results show the code, heading, its parents and how many of your titles already use it. Codes on
+  imported titles are learned automatically; load the official Thema or BIC list (JSON, XML or CSV)
+  in Settings for the full scheme. Thema qualifiers are filed under the correct ONIX scheme.
+* **Users and roles** — viewer (read-only), editor (titles, imports, feeds) and admin (users,
+  settings, recipients, connectors). Role changes and deactivation apply on the next request; the
+  last admin cannot be removed; everyone can change their own password; the change history records
+  who made each edit. Optional API key for the read-only JSON API.
 * **Tax and currency are settings** — UK zero-rated books with 20% standard rate by default;
   change the rates, codes and currency for Ireland, Germany, the US or anywhere else.
 
@@ -97,7 +103,7 @@ tests/test_roundtrip.py         import → export → validate → re-import →
 
 ## Roadmap
 
-SFTP delivery to recipients · per-recipient profiles · ONIX 2.1 output · Thema/BIC pickers ·
+SFTP delivery to recipients · per-recipient profiles · ONIX 2.1 output · sign-in with Microsoft or Google ·
 nightly stock sync that sets availability · WooCommerce connector · multi-language UI.
 See [CONTRIBUTING.md](CONTRIBUTING.md).
 

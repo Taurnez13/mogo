@@ -60,6 +60,9 @@ The brand mark `Taur·nez` carries the only decorative use of the accent, the mi
   filter", square means "do an action". That contrast is the reason for the exception.
 - **No cards for data.** Cards appear only where a form stands alone (add a description, link a
   related product); lists are tables.
+- **The subject picker is a ledger, not a dropdown**: results use the same ink rule, mono code column
+  and serif heading as the title list, so choosing a subject looks like reading the catalogue. Each
+  row is a real button; Enter takes the first result, Escape closes the list.
 - **Danger zone** is behind a `<details>` so a destructive action takes two deliberate steps.
 
 ## Copy

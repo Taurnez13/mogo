@@ -113,6 +113,9 @@ def log_change(db: Session, product: m.Product, field: str, old, new, who: str =
             return False
     except Exception:
         pass
+    if who == "web":
+        from .auth import current_user
+        who = current_user.get()
     db.add(m.ChangeLog(product_id=product.id, field=field, old_value=o, new_value=n, changed_by=who))
     product.updated_at = datetime.utcnow()
     return True
@@ -212,3 +215,126 @@ def build_feed(db: Session, r, mode: str, settings: dict, export_dir, tag_style:
     db.add(run)
     db.flush()
     return run, prods
+
+
+# --------------------------------------------------------------------------- #
+# Subject lookup (Thema / BIC / BISAC picker)
+# --------------------------------------------------------------------------- #
+
+SCHEME_NAMES = {"93": "Thema", "12": "BIC", "10": "BISAC", "94": "Thema place qualifier", "95": "Thema language qualifier",
+                "96": "Thema time period qualifier", "97": "Thema educational purpose qualifier",
+                "98": "Thema interest age qualifier", "99": "Thema style qualifier"}
+
+
+def learn_subjects_from_catalogue(db: Session) -> int:
+    """Add every (scheme, code, heading) already used on a title to the lookup list. Official entries win."""
+    have = {(sc.scheme, sc.code) for sc in db.scalars(select(m.SubjectCode))}
+    added = 0
+    rows = db.execute(select(m.Subject.scheme, m.Subject.code, func.max(m.Subject.heading))
+                      .where(m.Subject.code.isnot(None), m.Subject.scheme.notin_(["20", "23", "24"]))
+                      .group_by(m.Subject.scheme, m.Subject.code)).all()
+    for scheme, code, heading in rows:
+        if (scheme, code) in have or not heading:
+            continue
+        db.add(m.SubjectCode(scheme=scheme, code=code, heading=heading[:400], source="catalogue")); added += 1
+    db.commit()
+    return added
+
+
+def thema_scheme_for(code: str) -> str:
+    """Thema qualifiers have their own ONIX scheme numbers, chosen by the first character of the code."""
+    return {"1": "94", "2": "95", "3": "96", "4": "97", "5": "98", "6": "99"}.get(code[:1], "93")
+
+
+def load_subject_file(db: Session, scheme: str, data: bytes, filename: str = "") -> dict:
+    """Load an official scheme list. Accepts EDItEUR's Thema JSON or XML, or any CSV with a code column
+    and a heading/description column. For Thema, qualifier codes are filed under their own schemes."""
+    import csv as _csv, io as _io, json as _json
+    pairs: list[tuple[str, str, Optional[str]]] = []
+    text_ = data.decode("utf-8-sig", errors="replace").strip()
+    if text_.startswith("{") or text_.startswith("["):
+        def walk(o):
+            if isinstance(o, dict):
+                keys = {k.lower(): k for k in o}
+                ck = keys.get("codevalue") or keys.get("code"); hk = keys.get("codedescription") or keys.get("heading") or keys.get("description")
+                if ck and hk and isinstance(o[ck], str) and isinstance(o[hk], str):
+                    nk = keys.get("codenotes") or keys.get("notes")
+                    pairs.append((o[ck].strip(), o[hk].strip(), (o.get(nk) or None) if nk else None))
+                for v in o.values():
+                    walk(v)
+            elif isinstance(o, list):
+                for v in o:
+                    walk(v)
+        walk(_json.loads(text_))
+    elif text_.startswith("<"):
+        from lxml import etree
+        root = etree.fromstring(data)
+        for el in root.iter():
+            kids = {etree.QName(c).localname.lower(): (c.text or "").strip() for c in el if isinstance(c.tag, str)}
+            if kids.get("codevalue") and kids.get("codedescription"):
+                pairs.append((kids["codevalue"], kids["codedescription"], kids.get("codenotes") or None))
+    else:
+        reader = _csv.reader(_io.StringIO(text_))
+        header = [h.strip().lower() for h in next(reader, [])]
+        def col(*names):
+            for n in names:
+                for i, h in enumerate(header):
+                    if n in h:
+                        return i
+            return None
+        ci, hi, ni = col("code"), col("heading", "description", "label", "literal"), col("note")
+        if ci is None or hi is None:
+            raise ValueError("The CSV needs a column whose name contains 'code' and one containing 'heading' or 'description'.")
+        for row in reader:
+            if len(row) > max(ci, hi) and row[ci].strip() and row[hi].strip():
+                pairs.append((row[ci].strip(), row[hi].strip(), row[ni].strip() if ni is not None and len(row) > ni and row[ni].strip() else None))
+    if not pairs:
+        raise ValueError("No codes were found in that file.")
+    existing = {(sc.scheme, sc.code): sc for sc in db.scalars(select(m.SubjectCode))}
+    added = updated = 0
+    for code, heading, notes in pairs:
+        sch = thema_scheme_for(code) if scheme == "93" else scheme
+        sc = existing.get((sch, code))
+        if sc:
+            sc.heading, sc.notes, sc.source = heading[:400], notes, "official"; updated += 1
+        else:
+            sc = m.SubjectCode(scheme=sch, code=code, heading=heading[:400], notes=notes, source="official")
+            db.add(sc); existing[(sch, code)] = sc; added += 1
+    db.commit()
+    return {"added": added, "updated": updated}
+
+
+def search_subjects(db: Session, scheme: str, q: str, limit: int = 25) -> list[dict]:
+    q = (q or "").strip()
+    schemes = ["93", "94", "95", "96", "97", "98", "99"] if scheme == "93" else [scheme]
+    stmt = select(m.SubjectCode).where(m.SubjectCode.scheme.in_(schemes))
+    if q:
+        words = q.split()
+        code_like = m.SubjectCode.code.ilike(f"{q}%")
+        head = [m.SubjectCode.heading.ilike(f"%{w}%") for w in words]
+        from sqlalchemy import and_, case
+        stmt = stmt.where(or_(code_like, and_(*head))).order_by(case((m.SubjectCode.code.ilike(q), 0), (code_like, 1), else_=2),
+                                                               func.length(m.SubjectCode.code), m.SubjectCode.code)
+    else:
+        stmt = stmt.where(func.length(m.SubjectCode.code) == 1).order_by(m.SubjectCode.code)
+    rows = db.scalars(stmt.limit(limit)).all()
+    if not rows:
+        return []
+    uses = dict(db.execute(select(m.Subject.code, func.count()).where(m.Subject.scheme.in_(schemes),
+                           m.Subject.code.in_([r.code for r in rows])).group_by(m.Subject.code)).all())
+    by_code = {(r.scheme, r.code): r.heading for r in db.scalars(select(m.SubjectCode).where(m.SubjectCode.scheme.in_(schemes),
+               m.SubjectCode.code.in_({r.code[:i] for r in rows for i in range(1, len(r.code))})))}
+    out = []
+    for r in rows:
+        trail = [by_code[(r.scheme, r.code[:i])] for i in range(1, len(r.code)) if (r.scheme, r.code[:i]) in by_code]
+        out.append({"scheme": r.scheme, "code": r.code, "heading": r.heading, "notes": r.notes, "path": " / ".join(trail),
+                    "uses": uses.get(r.code, 0), "official": r.source == "official"})
+    return out
+
+
+def subject_counts(db: Session) -> dict:
+    rows = db.execute(select(m.SubjectCode.scheme, m.SubjectCode.source, func.count()).group_by(m.SubjectCode.scheme, m.SubjectCode.source)).all()
+    out: dict = {}
+    for scheme, source, n in rows:
+        out.setdefault(scheme, {"official": 0, "catalogue": 0})[source] = n
+    return out

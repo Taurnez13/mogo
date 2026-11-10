@@ -52,15 +52,20 @@
   <form method="post" action="/media/harvest"><input type="hidden" name="limit" value="5000"><button class="btn" data-working="Downloading covers, this can take a few minutes…">Download all remaining covers</button></form>
   <p class="help">Downloads run inside this request; a thousand images takes a few minutes. Re-running only fetches what is missing.</p>
 
-  <h2>Users</h2>
-  <div class="scroll"><table class="ledger"><tbody>
-  {% for u in users %}<tr><td>{{ u.username }}</td><td class="small muted">{{ u.role }}</td><td style="width:90px">{% if u.username != user %}<form method="post" action="/users/{{ u.id }}/delete" class="inline"><button class="btn danger sm">remove</button></form>{% endif %}</td></tr>{% endfor %}
+  <h2>Subject lists</h2>
+  <p class="small">The subject picker on each title searches these lists. Codes already on your titles are learned automatically; loading the official file adds every code and its notes.</p>
+  {% if subject_counts %}
+  <div class="scroll"><table class="ledger"><thead><tr><th>Scheme</th><th>Official codes</th><th>Learned from titles</th></tr></thead><tbody>
+  {% for scheme, c in subject_counts|dictsort %}<tr><td>{{ scheme_names.get(scheme, 'Scheme ' ~ scheme) }}</td><td>{{ c.official }}</td><td>{{ c.catalogue }}</td></tr>{% endfor %}
   </tbody></table></div>
-  <form method="post" action="/users" class="row c3" style="align-items:end;margin-top:10px">
-    <div class="field"><label>Username</label><input type="text" name="username" required autocomplete="off"></div>
-    <div class="field"><label>Password</label><input type="password" name="password" required minlength="8" autocomplete="new-password"></div>
-    <div class="field" style="display:flex;gap:8px;align-items:end"><div style="flex:1"><label>Role</label><select name="role"><option value="editor">editor</option><option value="admin">admin</option></select></div><button class="btn quiet">Add</button></div>
+  {% else %}<div class="empty">No subject codes yet. Import titles or load a list below.</div>{% endif %}
+  <form method="post" action="/subjects/load" enctype="multipart/form-data" class="row c2" style="align-items:end;margin-top:12px">
+    <div class="field"><label for="sch">Scheme</label><select name="scheme" id="sch"><option value="93">Thema (subjects and qualifiers)</option><option value="12">BIC 2.1</option><option value="10">BISAC</option></select></div>
+    <div class="field"><label for="sf">File (JSON, XML or CSV)</label><input type="file" id="sf" name="file" accept=".json,.xml,.csv,.txt" required></div>
+    <div><button class="btn" data-working="Loading codes…">Load list</button></div>
   </form>
+  <p class="help">Thema: download the JSON or XML code list from <a href="https://www.editeur.org/151/Thema/" target="_blank" rel="noopener">editeur.org</a> (free). BIC: export the list from <a href="https://www.bic.org.uk/" target="_blank" rel="noopener">bic.org.uk</a> as CSV. BISAC is licensed by BISG; load it only if you hold a licence. Any CSV with a code column and a heading or description column works.</p>
+  <form method="post" action="/subjects/learn"><button class="btn quiet sm" data-working="none">Learn codes from my titles again</button></form>
 </section>
 </div>
 {% endblock %}

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from . import models as m
 from .db import get_session
 from .onix.codelists import label
-from .services import product_query
+from .services import product_query, search_subjects
 
 router = APIRouter()
 
@@ -50,3 +50,9 @@ def product(isbn: str, db: Session = Depends(get_session)):
     if not p:
         raise HTTPException(404)
     return _product_json(p)
+
+
+@router.get("/subjects/search")
+def subjects_search(scheme: str = "93", q: str = "", db: Session = Depends(get_session)):
+    """Type-ahead for the subject picker: matches the start of a code or all words of a heading."""
+    return search_subjects(db, scheme, q)

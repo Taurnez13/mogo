@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Users | MOGO{% endblock %}
+{% block content %}
+<h1>Users <span class="muted" style="font-size:18px">{{ users|length }}</span></h1>
+<p class="help">Viewers can read everything and change nothing. Editors can edit titles, import, and generate or send feeds. Admins can also manage users, settings, recipients and the Cin7 and Shopify connections.</p>
+<div class="scroll"><table class="ledger">
+  <thead><tr><th>Username</th><th>Role</th><th>Last signed in</th><th>Status</th><th>Reset password</th><th></th></tr></thead>
+  <tbody>
+  {% for u in users %}
+  <tr>
+    <td><span class="t">{{ u.username }}</span>{% if u.username == user %} <span class="muted small">(you)</span>{% endif %}</td>
+    <td><form method="post" action="/users/{{ u.id }}" class="actions"><label class="sr" for="role{{ u.id }}">Role for {{ u.username }}</label><select name="role" id="role{{ u.id }}" style="width:auto">{% for r in roles %}<option value="{{ r }}" {{ 'selected' if r == u.role }}>{{ r }}</option>{% endfor %}</select><button class="btn quiet sm" data-working="none">Set role</button></form></td>
+    <td class="small">{{ u.last_login_at.strftime('%d %b %Y %H:%M') if u.last_login_at else 'never' }}</td>
+    <td><span class="status {{ 'active' if u.is_active else 'withdrawn' }}">{{ 'active' if u.is_active else 'deactivated' }}</span></td>
+    <td><form method="post" action="/users/{{ u.id }}" class="actions"><input type="hidden" name="action" value="password"><label class="sr" for="pw{{ u.id }}">New password for {{ u.username }}</label><input type="password" id="pw{{ u.id }}" name="new_password" minlength="8" required autocomplete="new-password" placeholder="new password" style="width:160px"><button class="btn quiet sm" data-working="none">Reset</button></form></td>
+    <td style="white-space:nowrap">{% if u.username != user %}
+      <form method="post" action="/users/{{ u.id }}" class="inline"><input type="hidden" name="action" value="{{ 'deactivate' if u.is_active else 'activate' }}"><button class="btn quiet sm" data-working="none">{{ 'Deactivate' if u.is_active else 'Reactivate' }}</button></form>
+      <form method="post" action="/users/{{ u.id }}" class="inline" onsubmit="return confirm('Remove {{ u.username }}? Their past edits stay in the history.')"><input type="hidden" name="action" value="delete"><button class="btn danger sm" data-working="none">Remove</button></form>
+    {% endif %}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+
+<h2>Add a user</h2>
+<form method="post" action="/users" class="row c4" style="align-items:end;max-width:860px">
+  <div class="field"><label for="nu">Username</label><input type="text" id="nu" name="username" required autocomplete="off"></div>
+  <div class="field"><label for="np">Starting password</label><input type="password" id="np" name="password" required minlength="8" autocomplete="new-password"></div>
+  <div class="field"><label for="nr">Role</label><select name="role" id="nr">{% for r in roles %}<option value="{{ r }}" {{ 'selected' if r == 'editor' }}>{{ r }}</option>{% endfor %}</select></div>
+  <div class="field"><button class="btn primary">Add user</button></div>
+</form>
+<p class="help">Pass the starting password on yourself; MOGO does not send email. Each person can change theirs under Account. Deactivating keeps the account and its history but blocks sign-in at once.</p>
+{% endblock %}

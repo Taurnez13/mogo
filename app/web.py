@@ -28,7 +28,9 @@ from .connectors import cin7 as cin7c, shopify as shopc
 from .auth import hash_password, verify_password
 from .csvio import import_csv, export_csv, template_csv
 from .delivery import test_connection, deliver, DeliveryError
-from .services import RECIPIENT_PRESETS, build_feed, feed_products
+from .services import (RECIPIENT_PRESETS, build_feed, feed_products, learn_subjects_from_catalogue,
+                       load_subject_file, subject_counts, thema_scheme_for, SCHEME_NAMES)
+from .auth import ROLES
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
@@ -56,7 +58,8 @@ def render(request: Request, name: str, **ctx):
     org = request.session.get("org")
     cur = request.session.get("currency") or "GBP"
     return templates.TemplateResponse(request, name, {"request": request, "flash": flash, "status_class": STATUS_CLASS,
-                                                      "user": request.session.get("user"), "org_name": org, "cur": cur, **ctx})
+                                                      "user": request.session.get("user"), "role": request.session.get("role"),
+                                                      "org_name": org, "cur": cur, **ctx})
 
 
 def flash(request: Request, msg: str, kind: str = "ok"):
@@ -139,6 +142,9 @@ def login(request: Request, db: Session = Depends(get_session), username: str = 
     u = db.scalar(select(m.User).where(m.User.username == username.strip()))
     if not u or not verify_password(password, u.password_hash):
         return render(request, "login.html", error="Wrong username or password.", next=next)
+    if not u.is_active:
+        return render(request, "login.html", error="This account has been deactivated. Ask an admin to reactivate it.", next=next)
+    u.last_login_at = datetime.utcnow(); db.commit()
     request.session["user"] = u.username
     request.session["role"] = u.role
     st = get_settings(db)
@@ -153,28 +159,118 @@ def logout(request: Request):
     return RedirectResponse("/login", status_code=303)
 
 
+# --------------------------------------------------------------------------- #
+# Users and own account
+# --------------------------------------------------------------------------- #
+
+def _admin_count(db: Session) -> int:
+    return db.scalar(select(func.count(m.User.id)).where(m.User.role == "admin", m.User.is_active.is_(True))) or 0
+
+
+@router.get("/users", response_class=HTMLResponse)
+def users_page(request: Request, db: Session = Depends(get_session)):
+    users = db.scalars(select(m.User).order_by(m.User.username)).all()
+    return render(request, "users.html", users=users, roles=ROLES)
+
+
 @router.post("/users")
 def user_add(request: Request, db: Session = Depends(get_session), username: str = Form(...), password: str = Form(...), role: str = Form("editor")):
-    if request.session.get("role") != "admin":
-        raise HTTPException(403, "Admins only")
+    username = username.strip()
+    if role not in ROLES:
+        role = "editor"
     if len(password) < 8:
-        flash(request, "Password must be at least 8 characters.", "error")
-    elif db.scalar(select(m.User).where(m.User.username == username.strip())):
-        flash(request, "That username already exists.", "error")
+        flash(request, "The password needs at least 8 characters. Nothing was added.", "error")
+    elif not username:
+        flash(request, "Enter a username.", "error")
+    elif db.scalar(select(m.User).where(m.User.username == username)):
+        flash(request, f"There is already a user called {username}. Choose another name.", "error")
     else:
-        db.add(m.User(username=username.strip(), password_hash=hash_password(password), role=role)); db.commit()
-        flash(request, f"Added user {username}.")
-    return RedirectResponse("/settings", status_code=303)
+        db.add(m.User(username=username, password_hash=hash_password(password), role=role)); db.commit()
+        flash(request, f"Added {username} as {role}. Give them the password; they can change it under Account.")
+    return RedirectResponse("/users", status_code=303)
 
 
-@router.post("/users/{uid}/delete")
-def user_delete(request: Request, uid: int, db: Session = Depends(get_session)):
-    if request.session.get("role") != "admin":
-        raise HTTPException(403, "Admins only")
+@router.post("/users/{uid}")
+def user_update(request: Request, uid: int, db: Session = Depends(get_session), role: str = Form(""), action: str = Form("save"),
+                new_password: str = Form("")):
     u = db.get(m.User, uid)
-    if u and u.username != request.session.get("user"):
-        db.delete(u); db.commit(); flash(request, f"Removed {u.username}.")
+    if not u:
+        raise HTTPException(404)
+    me = request.session.get("user")
+    is_last_admin = u.role == "admin" and u.is_active and _admin_count(db) <= 1
+    if action == "deactivate":
+        if u.username == me:
+            flash(request, "You cannot deactivate your own account.", "error")
+        elif is_last_admin:
+            flash(request, "This is the only active admin. Make someone else an admin first.", "error")
+        else:
+            u.is_active = False; flash(request, f"{u.username} can no longer sign in.")
+    elif action == "activate":
+        u.is_active = True; flash(request, f"{u.username} can sign in again.")
+    elif action == "password":
+        if len(new_password) < 8:
+            flash(request, "The new password needs at least 8 characters. Nothing was changed.", "error")
+        else:
+            u.password_hash = hash_password(new_password); flash(request, f"Password reset for {u.username}.")
+    elif action == "delete":
+        if u.username == me:
+            flash(request, "You cannot remove your own account.", "error")
+        elif is_last_admin:
+            flash(request, "This is the only active admin. Make someone else an admin first.", "error")
+        else:
+            db.delete(u); flash(request, f"Removed {u.username}. Their past edits stay in the history.")
+    else:  # role change
+        if role in ROLES and role != u.role:
+            if is_last_admin:
+                flash(request, "This is the only active admin. Make someone else an admin first.", "error")
+            else:
+                u.role = role; flash(request, f"{u.username} is now {role}.")
+    db.commit()
+    return RedirectResponse("/users", status_code=303)
+
+
+@router.get("/account", response_class=HTMLResponse)
+def account_page(request: Request, db: Session = Depends(get_session)):
+    u = db.scalar(select(m.User).where(m.User.username == request.session.get("user")))
+    edits = db.scalar(select(func.count(m.ChangeLog.id)).where(m.ChangeLog.changed_by == u.username)) if u else 0
+    return render(request, "account.html", u=u, edits=edits)
+
+
+@router.post("/account")
+def account_save(request: Request, db: Session = Depends(get_session), current_password: str = Form(...),
+                 new_password: str = Form(...), confirm_password: str = Form(...)):
+    u = db.scalar(select(m.User).where(m.User.username == request.session.get("user")))
+    if not u or not verify_password(current_password, u.password_hash):
+        flash(request, "The current password is not right. Nothing was changed.", "error")
+    elif len(new_password) < 8:
+        flash(request, "The new password needs at least 8 characters.", "error")
+    elif new_password != confirm_password:
+        flash(request, "The two new passwords do not match.", "error")
+    else:
+        u.password_hash = hash_password(new_password); db.commit()
+        flash(request, "Password changed.")
+    return RedirectResponse("/account", status_code=303)
+
+
+# --------------------------------------------------------------------------- #
+# Subject scheme lists (behind the picker)
+# --------------------------------------------------------------------------- #
+
+@router.post("/subjects/load")
+async def subjects_load(request: Request, db: Session = Depends(get_session), scheme: str = Form("93"), file: UploadFile = File(...)):
+    try:
+        res = load_subject_file(db, scheme, await file.read(), file.filename or "")
+        flash(request, f"{SCHEME_NAMES.get(scheme, 'Scheme ' + scheme)} list loaded: {res['added']} new codes, {res['updated']} updated.")
+    except Exception as e:
+        flash(request, f"That file could not be read: {e}", "error")
     return RedirectResponse("/settings", status_code=303)
+
+
+@router.post("/subjects/learn")
+def subjects_learn(request: Request, db: Session = Depends(get_session)):
+    n = learn_subjects_from_catalogue(db)
+    flash(request, f"{n} codes added to the picker from subjects already on your titles." if n else "The picker already knows every code used on your titles.")
+    return RedirectResponse(request.headers.get("referer") or "/settings", status_code=303)
 
 
 # --------------------------------------------------------------------------- #
@@ -274,8 +370,10 @@ def title_detail(request: Request, pid: int, db: Session = Depends(get_session),
     gbp_inc = next((pr for pr in (sd.prices if sd else []) if pr.currency == (st["currency"] or "GBP") and pr.price_type == "02"), None)
     links = {l.system: l for l in p.external_ids}
     all_series = db.scalars(select(m.Series).order_by(m.Series.title)).all()
+    codes = [sj.code for sj in p.subjects if sj.code]
+    known = {(sc.scheme, sc.code): sc.heading for sc in db.scalars(select(m.SubjectCode).where(m.SubjectCode.code.in_(codes)))} if codes else {}
     return render(request, "title_detail.html", p=p, tab=tab, related=related, sd=sd, gbp_inc=gbp_inc, links=links,
-                  all_series=all_series, settings=st)
+                  all_series=all_series, settings=st, known=known)
 
 
 @router.post("/titles/{pid}/edit")
@@ -394,7 +492,17 @@ def subject_add(request: Request, pid: int, db: Session = Depends(get_session), 
         if sj:
             log_change(db, p, f"subject:{sj.scheme}", sj.code or sj.heading, None); p.subjects.remove(sj)
     elif code.strip() or heading.strip():
-        version = {"93": "1.6", "10": "2024", "12": "2.1"}.get(scheme)
+        code = code.strip().upper() if scheme in ("93", "12", "10") else code.strip()
+        if scheme == "93" and code:
+            scheme = thema_scheme_for(code)
+        if code and not heading.strip():
+            known = db.scalar(select(m.SubjectCode).where(m.SubjectCode.scheme == scheme, m.SubjectCode.code == code))
+            if known:
+                heading = known.heading
+        if code and any(x.scheme == scheme and x.code == code for x in p.subjects):
+            flash(request, f"{code} is already on this title.", "warn")
+            return RedirectResponse(f"/titles/{pid}?tab=subjects", status_code=303)
+        version = {"93": "1.6", "94": "1.6", "95": "1.6", "96": "1.6", "97": "1.6", "98": "1.6", "99": "1.6", "10": "2024", "12": "2.1"}.get(scheme)
         name = (get_settings(db)["sender_name"] + " categories") if scheme == "24" else None
         if main_subject:
             for x in p.subjects:
@@ -564,6 +672,7 @@ async def import_run(request: Request, db: Session = Depends(get_session), file:
         shutil.copyfileobj(file.file, tmp); path = tmp.name
     st = OnixImporter(db).import_file(path)
     Path(path).unlink(missing_ok=True)
+    learn_subjects_from_catalogue(db)
     flash(request, f"Import finished: {st.created} created, {st.updated} updated, {len(st.errors)} errors."
           + (" First error: " + st.errors[0] if st.errors else ""), "ok" if not st.errors else "warn")
     return RedirectResponse("/titles?sort=updated", status_code=303)
@@ -823,8 +932,8 @@ def settings_page(request: Request, db: Session = Depends(get_session)):
     s = get_settings(db)
     covers_total = db.scalar(select(func.count(m.SupportingResource.id)).where(m.SupportingResource.content_type == "01"))
     covers_local = db.scalar(select(func.count(m.SupportingResource.id)).where(m.SupportingResource.content_type == "01", m.SupportingResource.local_path.isnot(None)))
-    users = db.scalars(select(m.User).order_by(m.User.username)).all()
-    return render(request, "settings.html", settings=s, covers_total=covers_total, covers_local=covers_local, users=users)
+    return render(request, "settings.html", settings=s, covers_total=covers_total, covers_local=covers_local,
+                  subject_counts=subject_counts(db), scheme_names=SCHEME_NAMES)
 
 
 @router.post("/settings")

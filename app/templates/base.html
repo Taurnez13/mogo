@@ -22,17 +22,23 @@
       <a href="/series" class="{{ 'on' if path.startswith('/series') }}">Series</a>
       <div class="group">Feeds</div>
       <a href="/export" class="{{ 'on' if path.startswith('/export') }}">ONIX export</a>
-      <a href="/recipients" class="{{ 'on' if path.startswith('/recipients') }}">Recipients</a>
       <a href="/import" class="{{ 'on' if path.startswith('/import') }}">ONIX import</a>
+      {% if role == 'admin' %}
+      <a href="/recipients" class="{{ 'on' if path.startswith('/recipients') }}">Recipients</a>
       <a href="/sync" class="{{ 'on' if path.startswith('/sync') }}">Cin7 &amp; Shopify</a>
       <div class="group">System</div>
       <a href="/settings" class="{{ 'on' if path.startswith('/settings') }}">Settings</a>
+      <a href="/users" class="{{ 'on' if path.startswith('/users') }}">Users</a>
+      {% endif %}
       <a href="/api/docs">API</a>
-      <div class="group">{{ user }}</div><a href="/logout">Sign out</a>
+      <div class="group">{{ user }}{% if role %}, {{ role }}{% endif %}</div>
+      <a href="/account" class="{{ 'on' if path.startswith('/account') }}">Account</a>
+      <a href="/logout">Sign out</a>
     </nav>
     {% endif %}
   </aside>
   <main class="main">
+    {% if role == 'viewer' %}<div class="flash warn" role="note">Read-only account. You can look at everything; saving is switched off.</div>{% endif %}
     {% if flash %}<div class="flash {{ flash.kind }}" role="status">{{ flash.msg }}</div>{% endif %}
     {% block content %}{% endblock %}
     <footer class="foot">MOGO, open-source title metadata and ONIX 3.0. MIT licence.</footer>

@@ -598,4 +598,19 @@ class User(Base):
     username: Mapped[str] = mapped_column(String(100), unique=True)
     password_hash: Mapped[str] = mapped_column(String(300))
     role: Mapped[str] = mapped_column(String(10), default="editor")  # admin | editor | viewer
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_login_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+
+
+class SubjectCode(Base):
+    """Lookup list behind the subject picker: Thema, BIC, BISAC or any scheme the publisher loads.
+    Filled from the official scheme file (Settings) and from codes already used in the catalogue."""
+    __tablename__ = "subject_code"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    scheme: Mapped[str] = mapped_column(String(2), index=True)   # ONIX List 27
+    code: Mapped[str] = mapped_column(String(40), index=True)
+    heading: Mapped[str] = mapped_column(String(400))
+    notes: Mapped[Optional[str]] = mapped_column(Text)
+    source: Mapped[str] = mapped_column(String(10), default="catalogue")  # 'official' | 'catalogue'
+    __table_args__ = (UniqueConstraint("scheme", "code"),)

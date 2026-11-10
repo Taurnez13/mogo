@@ -163,3 +163,18 @@ code { font-family: var(--mono); font-size: 12.5px; background: var(--paper-2); 
   .detail, .cols, .row.c2, .row.c3, .row.c4 { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* visually hidden label, still read by screen readers */
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* subject picker: a ledger of codes, same rule and type voice as the tables */
+.picker { list-style: none; margin: 0 0 12px; padding: 0; max-height: 320px; overflow-y: auto; border-top: 1px solid var(--ink); border-bottom: 1px solid var(--rule); background: #fff; }
+.picker li { border-bottom: 1px solid var(--rule-2); }
+.picker button { display: grid; grid-template-columns: 92px 1fr auto; gap: 2px 12px; align-items: baseline; width: 100%; text-align: left; font: inherit; color: var(--ink); background: none; border: 0; padding: 8px 10px; min-height: 36px; }
+.picker button:hover, .picker button:focus-visible { background: var(--paper-2); }
+.picker button:active { background: var(--rule-2); }
+.picker .ph { font-family: var(--serif); font-size: 15.5px; }
+.picker .pp { grid-column: 2; color: var(--ink-3); font-size: 12.5px; }
+.picker .pu { grid-column: 3; grid-row: 1; color: var(--ink-2); font-size: 12.5px; white-space: nowrap; }
+@media (pointer: coarse) { .picker button { min-height: 44px; } }
+@media (max-width: 900px) { .picker button { grid-template-columns: 72px 1fr; } .picker .pu { grid-column: 2; grid-row: auto; } }

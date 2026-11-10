@@ -179,7 +179,7 @@
       <h2 class="h3">{{ name }}</h2>
       <div class="scroll"><table class="ledger"><tbody>
       {% for sj in items %}
-      <tr><td class="mono" style="width:120px">{{ sj.code or '' }}{% if sj.main_subject %} <span class="muted">main</span>{% endif %}</td><td>{{ sj.heading or '' }}</td>
+      <tr><td class="mono" style="width:120px">{{ sj.code or '' }}{% if sj.main_subject %} <span class="muted">main</span>{% endif %}</td><td>{% if sj.heading %}{{ sj.heading }}{% elif known.get((sj.scheme, sj.code)) %}<span class="muted">{{ known[(sj.scheme, sj.code)] }}</span>{% endif %}</td>
         <td style="width:80px"><form method="post" action="/titles/{{ p.id }}/subjects" class="inline"><input type="hidden" name="subject_id" value="{{ sj.id }}"><input type="hidden" name="scheme" value="{{ sj.scheme }}"><button class="btn danger sm">remove</button></form></td></tr>
       {% endfor %}
       </tbody></table></div>
@@ -189,14 +189,60 @@
     {% if others %}<h2 class="h3">Other schemes</h2><div class="scroll"><table class="ledger"><tbody>{% for sj in others %}<tr><td class="mono">{{ label(27, sj.scheme) }}</td><td class="mono">{{ sj.code }}</td><td>{{ sj.heading }}</td></tr>{% endfor %}</tbody></table></div>{% endif %}
     <div class="card" style="margin-top:18px">
       <h2 class="h3">Add subject</h2>
-      <form method="post" action="/titles/{{ p.id }}/subjects" class="row c4" style="align-items:end">
-        <div class="field"><label>Scheme</label><select name="scheme"><option value="93">Thema</option><option value="12">BIC 2.1</option><option value="10">BISAC</option><option value="24">Own categories</option><option value="20">Keywords</option></select></div>
-        <div class="field"><label>Code</label><input type="text" name="code" placeholder="QRMP"></div>
-        <div class="field"><label>Heading / keywords</label><input type="text" name="heading" placeholder="Christian life and practice"></div>
-        <div class="field" style="display:flex;gap:10px;align-items:center"><div class="check"><input type="checkbox" name="main_subject" id="ms" value="1"><label for="ms" style="margin:0">Main</label></div><button class="btn primary sm">Add</button></div>
+      <form method="post" action="/titles/{{ p.id }}/subjects" id="subjform">
+        <div class="row c4" style="align-items:end">
+          <div class="field"><label for="sj-scheme">Scheme</label><select name="scheme" id="sj-scheme"><option value="93">Thema</option><option value="12">BIC 2.1</option><option value="10">BISAC</option><option value="24">Own categories</option><option value="20">Keywords</option></select></div>
+          <div class="field" style="grid-column: span 2"><label for="sj-find">Find a code <span class="muted">(type words or the start of a code)</span></label><input type="search" id="sj-find" autocomplete="off" placeholder="prayer, or QRM" aria-controls="sj-results" aria-describedby="sj-status"></div>
+          <div class="check field"><input type="checkbox" name="main_subject" id="ms" value="1"><label for="ms" style="margin:0">Main subject</label></div>
+        </div>
+        <p id="sj-status" class="small muted" role="status" aria-live="polite"></p>
+        <ul id="sj-results" class="picker" hidden></ul>
+        <div class="row c4" style="align-items:end">
+          <div class="field"><label for="sj-code">Code</label><input type="text" name="code" id="sj-code" class="mono" autocomplete="off"></div>
+          <div class="field" style="grid-column: span 2"><label for="sj-heading">Heading <span class="muted">(or keywords, separated by semicolons)</span></label><input type="text" name="heading" id="sj-heading"></div>
+          <div class="field"><button class="btn primary" data-working="none">Add subject</button></div>
+        </div>
       </form>
-      <p class="help">Thema codes: <a href="https://ns.editeur.org/thema/en" target="_blank" rel="noopener">ns.editeur.org/thema</a>. Keywords are one entry, semicolon-separated.</p>
+      <p class="help">Pick from the results or type a code yourself; a known code fills in its own heading. Thema qualifiers (codes starting 1 to 6) are filed under the right qualifier scheme automatically.</p>
     </div>
+    <script>
+    (function () {
+      var find = document.getElementById('sj-find'), list = document.getElementById('sj-results'), status = document.getElementById('sj-status'),
+          scheme = document.getElementById('sj-scheme'), code = document.getElementById('sj-code'), heading = document.getElementById('sj-heading'), timer = null, seq = 0, shownFor = null;
+      function searchable() { return ['93', '12', '10'].indexOf(scheme.value) !== -1; }
+      function clear() { list.hidden = true; list.innerHTML = ''; }
+      function run() {
+        if (!searchable()) { clear(); status.textContent = 'This scheme has no list to search. Type the code and heading below.'; return; }
+        var q = find.value.trim(), mine = ++seq;
+        status.textContent = 'Searching…';
+        fetch('/api/subjects/search?scheme=' + encodeURIComponent(scheme.value) + '&q=' + encodeURIComponent(q))
+          .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+          .then(function (rows) {
+            if (mine !== seq) return;
+            clear(); shownFor = q;
+            if (!rows.length) { status.textContent = q ? 'No codes match "' + q + '". Load the full list in Settings, or type the code below.' : 'No list loaded for this scheme yet. Load one in Settings, or type the code below.'; return; }
+            status.textContent = (rows.length === 1 ? '1 code' : rows.length + (rows.length === 25 ? ' or more' : '') + ' codes') + '. Choose one, or keep typing to narrow.';
+            rows.forEach(function (r) {
+              var li = document.createElement('li'), b = document.createElement('button');
+              b.type = 'button';
+              var c = document.createElement('span'); c.className = 'mono pc'; c.textContent = r.code;
+              var h = document.createElement('span'); h.className = 'ph'; h.textContent = r.heading;
+              b.appendChild(c); b.appendChild(h);
+              if (r.path) { var pa = document.createElement('span'); pa.className = 'pp'; pa.textContent = r.path; b.appendChild(pa); }
+              if (r.uses) { var u = document.createElement('span'); u.className = 'pu'; u.textContent = 'on ' + r.uses + (r.uses === 1 ? ' title' : ' titles'); b.appendChild(u); }
+              b.addEventListener('click', function () { code.value = r.code; heading.value = r.heading; clear(); status.textContent = 'Chosen ' + r.code + ', ' + r.heading + '. Press Add subject.'; code.form.querySelector('button.primary').focus(); });
+              li.appendChild(b); list.appendChild(li);
+            });
+            list.hidden = false;
+          })
+          .catch(function () { if (mine === seq) { clear(); status.textContent = 'The search could not be reached. Type the code and heading below instead.'; } });
+      }
+      find.addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(run, 180); });
+      find.addEventListener('focus', function () { if (!list.children.length) run(); });
+      find.addEventListener('keydown', function (e) { if (e.key === 'Escape') { clear(); status.textContent = ''; } if (e.key === 'Enter') { e.preventDefault(); var first = list.querySelector('button'); if (first && shownFor === find.value.trim()) first.click(); } });
+      scheme.addEventListener('change', function () { clear(); find.value = ''; status.textContent = ''; run(); });
+    })();
+    </script>
 
     {% elif tab == 'related' %}
     <div class="scroll"><table class="ledger">
