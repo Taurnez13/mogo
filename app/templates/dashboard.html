@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Overview — Taurnez{% endblock %}
+{% block title %}Overview | Taurnez{% endblock %}
 {% block content %}
 <div class="topbar">
   <h1>Catalogue overview</h1>
@@ -44,7 +44,7 @@
     {% if stats.forthcoming %}
     <ul class="plain">
       {% for p in stats.forthcoming %}
-      <li><a href="/titles/{{ p.id }}" class="serif">{{ p.title }}</a><span class="muted small">{{ p.publication_date or '—' }}</span></li>
+      <li><a href="/titles/{{ p.id }}" class="serif">{{ p.title }}</a><span class="muted small">{{ p.publication_date or 'not set' }}</span></li>
       {% endfor %}
     </ul>
     {% else %}<div class="empty">No forthcoming titles. <a href="/titles/new">Add one</a>.</div>{% endif %}
@@ -53,14 +53,14 @@
     {% if stats.recent %}
     <ul class="plain small">
       {% for c in stats.recent %}
-      <li><span><a href="/titles/{{ c.product_id }}">#{{ c.product_id }}</a> {{ c.field }} → <i>{{ (c.new_value or '—')[:60] }}</i></span><span class="muted">{{ c.changed_at.strftime('%d %b %H:%M') }}</span></li>
+      <li><span><a href="/titles/{{ c.product_id }}">#{{ c.product_id }}</a> {{ c.field }} set to <i>{{ (c.new_value or 'nothing')[:60] }}</i></span><span class="muted">{{ c.changed_at.strftime('%d %b %H:%M') }}</span></li>
       {% endfor %}
     </ul>
     {% else %}<div class="empty">Edits made here will be listed, so you can see what the next ONIX delta will carry.</div>{% endif %}
 
     <h2>Last export</h2>
     {% if stats.last_export %}
-    <p class="small">{{ stats.last_export.run_at.strftime('%d %b %Y %H:%M') }} — {{ stats.last_export.product_count }} products, {{ stats.last_export.mode }},
+    <p class="small">{{ stats.last_export.run_at.strftime('%d %b %Y %H:%M') }}: {{ stats.last_export.product_count }} products, {{ stats.last_export.mode }},
       {{ 'schema valid' if stats.last_export.valid else 'has validation errors' }}.
       <a href="/export/download/{{ stats.last_export.filename }}">Download</a></p>
     {% else %}<p class="small muted">No export yet.</p>{% endif %}

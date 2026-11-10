@@ -9,10 +9,13 @@
 <body>
 <div class="shell">
   <aside class="side">
-    <p class="brand">Taur<span>·</span>nez</p>
-    <div class="brand-sub">{{ org_name or "Title metadata &amp; ONIX" }}</div>
+    <header>
+      <p class="brand">Taur<span>·</span>nez</p>
+      <div class="brand-sub">{{ org_name or "Title metadata &amp; ONIX" }}</div>
+    </header>
     {% set path = request.url.path %}
-    <nav class="nav">
+    {% if user %}
+    <nav class="nav" aria-label="Main">
       <a href="/" class="{{ 'on' if path == '/' }}">Overview</a>
       <a href="/titles" class="{{ 'on' if path.startswith('/titles') }}">Titles</a>
       <a href="/contributors" class="{{ 'on' if path.startswith('/contributors') }}">Contributors</a>
@@ -24,13 +27,24 @@
       <div class="group">System</div>
       <a href="/settings" class="{{ 'on' if path.startswith('/settings') }}">Settings</a>
       <a href="/api/docs">API</a>
-      {% if user %}<div class="group">{{ user }}</div><a href="/logout">Sign out</a>{% endif %}
+      <div class="group">{{ user }}</div><a href="/logout">Sign out</a>
     </nav>
+    {% endif %}
   </aside>
   <main class="main">
-    {% if flash %}<div class="flash {{ flash.kind }}">{{ flash.msg }}</div>{% endif %}
+    {% if flash %}<div class="flash {{ flash.kind }}" role="status">{{ flash.msg }}</div>{% endif %}
     {% block content %}{% endblock %}
+    <footer class="foot">Taurnez, open-source title metadata and ONIX 3.0. MIT licence.</footer>
   </main>
 </div>
+<script>
+// Loading state (R-27): on submit, the pressed button shows progress and the form cannot be sent twice.
+document.addEventListener('submit', function (e) {
+  var f = e.target; if (f.dataset.busy) { e.preventDefault(); return; }
+  f.dataset.busy = '1';
+  var b = e.submitter || f.querySelector('button, input[type=submit]');
+  if (b) { b.setAttribute('aria-busy', 'true'); if (b.tagName === 'BUTTON' && b.dataset.working !== 'none') b.textContent = b.dataset.working || 'Working…'; }
+});
+</script>
 </body>
 </html>

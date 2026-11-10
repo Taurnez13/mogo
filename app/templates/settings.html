@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Settings — Taurnez{% endblock %}
+{% block title %}Settings | Taurnez{% endblock %}
 {% block content %}
 <h1>Settings</h1>
 <div class="cols">
@@ -49,13 +49,13 @@
 <section>
   <h2>Cover images</h2>
   <p class="small">{{ covers_local }} of {{ covers_total }} front covers are stored locally. The rest are still referenced from the host they were imported from and will break if that host goes away.</p>
-  <form method="post" action="/media/harvest"><input type="hidden" name="limit" value="5000"><button class="btn">Download all remaining covers</button></form>
+  <form method="post" action="/media/harvest"><input type="hidden" name="limit" value="5000"><button class="btn" data-working="Downloading covers, this can take a few minutes…">Download all remaining covers</button></form>
   <p class="help">Downloads run inside this request; a thousand images takes a few minutes. Re-running only fetches what is missing.</p>
 
   <h2>Users</h2>
-  <table class="ledger"><tbody>
+  <div class="scroll"><table class="ledger"><tbody>
   {% for u in users %}<tr><td>{{ u.username }}</td><td class="small muted">{{ u.role }}</td><td style="width:90px">{% if u.username != user %}<form method="post" action="/users/{{ u.id }}/delete" class="inline"><button class="btn danger sm">remove</button></form>{% endif %}</td></tr>{% endfor %}
-  </tbody></table>
+  </tbody></table></div>
   <form method="post" action="/users" class="row c3" style="align-items:end;margin-top:10px">
     <div class="field"><label>Username</label><input type="text" name="username" required autocomplete="off"></div>
     <div class="field"><label>Password</label><input type="password" name="password" required minlength="8" autocomplete="new-password"></div>

@@ -1,31 +1,32 @@
 {% extends "base.html" %}
-{% block title %}{{ p.title }} — Taurnez{% endblock %}
+{% block title %}{{ p.title }} | Taurnez{% endblock %}
 {% block content %}
 {% set cov = p.main_cover %}
 <p class="small"><a href="/titles">Titles</a> / <span class="mono">{{ p.isbn13 or p.record_reference }}</span></p>
 
 <div class="detail">
   <aside>
-    {% if cov %}<img class="cover" src="{{ '/media/' ~ cov.local_path if cov.local_path else cov.remote_url }}" alt="Cover of {{ p.title }}">
+    {% if cov %}<img class="cover" width="260" height="369" src="{{ '/media/' ~ cov.local_path if cov.local_path else cov.remote_url }}" alt="Cover of {{ p.title }}">
     {% else %}<div class="cover none">No cover yet</div>{% endif %}
     <form method="post" action="/titles/{{ p.id }}/cover" enctype="multipart/form-data" style="margin-top:8px">
-      <input type="file" name="file" accept="image/jpeg,image/png" required style="font-size:12px">
-      <button class="btn quiet sm" style="margin-top:6px">Upload cover</button>
+      <label for="coverfile">Replace cover (JPEG or PNG)</label>
+      <input type="file" id="coverfile" name="file" accept="image/jpeg,image/png" required style="font-size:12px">
+      <button class="btn quiet sm" style="margin-top:6px" data-working="Uploading…">Upload cover</button>
     </form>
-    {% if cov and not cov.local_path %}<p class="small muted">Still served from <code>{{ cov.remote_url.split('/')[2] }}</code> — download covers in Settings so they are stored here.</p>{% endif %}
+    {% if cov and not cov.local_path %}<p class="small muted">Still served from <code>{{ cov.remote_url.split('/')[2] }}</code>. Download covers in Settings so they are stored here.</p>{% endif %}
     <ul class="facts">
-      <li><span>ISBN-13</span><span class="mono">{{ p.isbn13 or '—' }}</span></li>
+      <li><span>ISBN-13</span><span class="mono">{{ p.isbn13 or 'not set' }}</span></li>
       <li><span>Format</span><span>{{ label(150, p.product_form) }}{% for f in p.form_details %} · {{ label(175, f.code) }}{% endfor %}</span></li>
       <li><span>Status</span><span class="status {{ status_class.get(p.publishing_status, '') }}">{{ label(64, p.publishing_status) }}</span></li>
-      <li><span>Published</span><span>{{ p.publication_date.strftime('%d %b %Y') if p.publication_date else '—' }}</span></li>
-      <li><span>RRP</span><span>{{ p.rrp_gbp|money(cur) or '—' }}{% if gbp_inc and gbp_inc.tax_rate_code == 'S' %} <span class="muted">inc. VAT</span>{% endif %}</span></li>
+      <li><span>Published</span><span>{{ p.publication_date.strftime('%d %b %Y') if p.publication_date else 'not set' }}</span></li>
+      <li><span>RRP</span><span>{{ p.rrp_gbp|money(cur) or 'not set' }}{% if gbp_inc and gbp_inc.tax_rate_code == 'S' %} <span class="muted">inc. VAT</span>{% endif %}</span></li>
       {% set pages = p.extents|selectattr('extent_type', 'in', ['00','05','10','11'])|map(attribute='value')|first %}
-      <li><span>Pages</span><span>{{ pages or '—' }}</span></li>
+      <li><span>Pages</span><span>{{ pages or 'not set' }}</span></li>
       {% set h = p.measures|selectattr('measure_type','equalto','01')|selectattr('unit','equalto','mm')|map(attribute='value')|first %}
       {% set w = p.measures|selectattr('measure_type','equalto','02')|selectattr('unit','equalto','mm')|map(attribute='value')|first %}
-      <li><span>Size</span><span>{{ (h|int ~ ' × ' ~ w|int ~ ' mm') if h and w else '—' }}</span></li>
-      <li><span>Imprint</span><span>{{ p.imprint_name or '—' }}</span></li>
-      <li><span>Availability</span><span>{{ label(65, sd.availability) if sd else '—' }}</span></li>
+      <li><span>Size</span><span>{{ (h|int ~ ' × ' ~ w|int ~ ' mm') if h and w else 'not set' }}</span></li>
+      <li><span>Imprint</span><span>{{ p.imprint_name or 'not set' }}</span></li>
+      <li><span>Availability</span><span>{{ label(65, sd.availability) if sd else 'not set' }}</span></li>
       <li><span>Cin7</span><span>{% if links.cin7 %}{{ links.cin7.secondary_id }}{% set st = links.cin7.snapshot %}{% if st and st.stock_total_available is defined %} · {{ st.stock_total_available }} available{% endif %}{% else %}<span class="muted">not linked</span>{% endif %}</span></li>
       <li><span>Shopify</span><span>{% if links.shopify %}{{ links.shopify.snapshot.status|lower if links.shopify.snapshot }} · £{{ links.shopify.snapshot.price if links.shopify.snapshot }}{% else %}<span class="muted">not linked</span>{% endif %}</span></li>
       <li><span>Updated</span><span>{{ p.updated_at.strftime('%d %b %Y') if p.updated_at }}</span></li>
@@ -56,10 +57,10 @@
       </div>
       <div class="field"><label>Subtitle</label><input type="text" name="subtitle" value="{{ p.subtitle or '' }}"></div>
       <div class="row c4">
-        <div class="field"><label>Format</label><select name="product_form">{% for code, lbl in options(150) %}<option value="{{ code }}" {{ 'selected' if code == p.product_form }}>{{ code }} — {{ lbl }}</option>{% endfor %}</select></div>
+        <div class="field"><label>Format</label><select name="product_form">{% for code, lbl in options(150) %}<option value="{{ code }}" {{ 'selected' if code == p.product_form }}>{{ code }}: {{ lbl }}</option>{% endfor %}</select></div>
         <div class="field"><label>Format description</label><input type="text" name="product_form_description" value="{{ p.product_form_description or '' }}" placeholder="A6 Paperback"></div>
-        <div class="field"><label>Status</label><select name="publishing_status">{% for code, lbl in options(64) %}<option value="{{ code }}" {{ 'selected' if code == p.publishing_status }}>{{ code }} — {{ lbl }}</option>{% endfor %}</select></div>
-        <div class="field"><label>Availability</label><select name="availability">{% for code, lbl in options(65) %}<option value="{{ code }}" {{ 'selected' if sd and code == sd.availability }}>{{ code }} — {{ lbl }}</option>{% endfor %}</select></div>
+        <div class="field"><label>Status</label><select name="publishing_status">{% for code, lbl in options(64) %}<option value="{{ code }}" {{ 'selected' if code == p.publishing_status }}>{{ code }}: {{ lbl }}</option>{% endfor %}</select></div>
+        <div class="field"><label>Availability</label><select name="availability">{% for code, lbl in options(65) %}<option value="{{ code }}" {{ 'selected' if sd and code == sd.availability }}>{{ code }}: {{ lbl }}</option>{% endfor %}</select></div>
       </div>
       <div class="row c4">
         <div class="field"><label>Publication date</label><input type="date" name="publication_date" value="{{ p.publication_date.isoformat() if p.publication_date }}"></div>
@@ -93,7 +94,7 @@
 
     <h2>Series</h2>
     <form method="post" action="/titles/{{ p.id }}/series" class="row c3" style="align-items:end">
-      <div class="field"><label>Existing series</label><select name="series_id"><option value="">—</option>{% for s in all_series %}<option value="{{ s.id }}">{{ s.title }}</option>{% endfor %}</select></div>
+      <div class="field"><label>Existing series</label><select name="series_id"><option value="">Choose a series</option>{% for s in all_series %}<option value="{{ s.id }}">{{ s.title }}</option>{% endfor %}</select></div>
       <div class="field"><label>or new series</label><input type="text" name="new_series"></div>
       <div class="field" style="display:flex;gap:8px;align-items:end"><div style="flex:1"><label>Number</label><input type="text" name="sequence"></div><button class="btn quiet">Add</button></div>
     </form>
@@ -120,9 +121,9 @@
     <div class="card">
       <form method="post" action="/titles/{{ p.id }}/texts">
         <input type="hidden" name="text_id" value="{{ tc.id }}">
-        <div class="head"><h3>{{ label(153, tc.text_type) }}</h3><span class="muted small">{{ label(34, tc.text_format) }}</span></div>
+        <div class="head"><h2 class="h3">{{ label(153, tc.text_type) }}</h2><span class="muted small">{{ label(34, tc.text_format) }}</span></div>
         <div class="row c3" style="margin-bottom:8px">
-          <div><label>Type</label><select name="text_type">{% for code, lbl in options(153) %}<option value="{{ code }}" {{ 'selected' if code == tc.text_type }}>{{ code }} — {{ lbl }}</option>{% endfor %}</select></div>
+          <div><label>Type</label><select name="text_type">{% for code, lbl in options(153) %}<option value="{{ code }}" {{ 'selected' if code == tc.text_type }}>{{ code }}: {{ lbl }}</option>{% endfor %}</select></div>
           <div><label>Author / source (for quotes)</label><input type="text" name="text_author" value="{{ tc.text_author or '' }}"></div>
         </div>
         <textarea name="text">{{ tc.text }}</textarea>
@@ -131,10 +132,10 @@
     </div>
     {% endfor %}
     <div class="card">
-      <h3>Add text</h3>
+      <h2 class="h3">Add text</h2>
       <form method="post" action="/titles/{{ p.id }}/texts">
         <div class="row c3" style="margin-bottom:8px">
-          <div><label>Type</label><select name="text_type">{% for code in ['03','02','10','04','05','06','12','13'] %}<option value="{{ code }}">{{ code }} — {{ label(153, code) }}</option>{% endfor %}</select></div>
+          <div><label>Type</label><select name="text_type">{% for code in ['03','02','10','04','05','06','12','13'] %}<option value="{{ code }}">{{ code }}: {{ label(153, code) }}</option>{% endfor %}</select></div>
           <div><label>Author / source</label><input type="text" name="text_author"></div>
         </div>
         <textarea name="text" placeholder="Plain text or simple HTML (<p>, <br>, <em>, <strong>, <ul><li>). Anything else is stripped on export."></textarea>
@@ -143,7 +144,7 @@
     </div>
 
     {% elif tab == 'contributors' %}
-    <table class="ledger">
+    <div class="scroll"><table class="ledger">
       <thead><tr><th>#</th><th>Name</th><th>Role</th><th>Bio</th><th></th></tr></thead>
       <tbody>
       {% for pc in p.contributors %}
@@ -153,14 +154,14 @@
         <td><form method="post" action="/titles/{{ p.id }}/contributors" class="inline"><input type="hidden" name="link_id" value="{{ pc.id }}"><button class="btn danger sm">remove</button></form></td></tr>
       {% endfor %}
       </tbody>
-    </table>
+    </table></div>
     <div class="card" style="margin-top:18px">
-      <h3>Add contributor</h3>
+      <h2 class="h3">Add contributor</h2>
       <form method="post" action="/titles/{{ p.id }}/contributors">
         <div class="row c3">
           <div class="field"><label>Existing contributor ID <span class="muted">(from the Contributors list)</span></label><input type="text" name="contributor_id" placeholder="e.g. 42"></div>
           <div class="field"><label>or new name</label><input type="text" name="new_name" placeholder="Firstname Surname"></div>
-          <div class="field"><label>Role</label><select name="role">{% for code in ['A01','A12','B01','B06','A24','A02','A13','B02','Z01'] %}<option value="{{ code }}">{{ code }} — {{ label(17, code) }}</option>{% endfor %}</select></div>
+          <div class="field"><label>Role</label><select name="role">{% for code in ['A01','A12','B01','B06','A24','A02','A13','B02','Z01'] %}<option value="{{ code }}">{{ code }}: {{ label(17, code) }}</option>{% endfor %}</select></div>
         </div>
         <div class="row c2">
           <div class="check"><input type="checkbox" name="corporate" id="corp" value="1"><label for="corp" style="margin:0">Corporate body (an organisation rather than a person)</label></div>
@@ -175,19 +176,19 @@
     {% for scheme, name in groups.items() %}
       {% set items = p.subjects|selectattr('scheme', 'equalto', scheme)|list %}
       {% if items %}
-      <h3>{{ name }}</h3>
-      <table class="ledger"><tbody>
+      <h2 class="h3">{{ name }}</h2>
+      <div class="scroll"><table class="ledger"><tbody>
       {% for sj in items %}
       <tr><td class="mono" style="width:120px">{{ sj.code or '' }}{% if sj.main_subject %} <span class="muted">main</span>{% endif %}</td><td>{{ sj.heading or '' }}</td>
         <td style="width:80px"><form method="post" action="/titles/{{ p.id }}/subjects" class="inline"><input type="hidden" name="subject_id" value="{{ sj.id }}"><input type="hidden" name="scheme" value="{{ sj.scheme }}"><button class="btn danger sm">remove</button></form></td></tr>
       {% endfor %}
-      </tbody></table>
+      </tbody></table></div>
       {% endif %}
     {% endfor %}
     {% set others = p.subjects|rejectattr('scheme', 'in', groups.keys()|list)|list %}
-    {% if others %}<h3>Other schemes</h3><table class="ledger"><tbody>{% for sj in others %}<tr><td class="mono">{{ label(27, sj.scheme) }}</td><td class="mono">{{ sj.code }}</td><td>{{ sj.heading }}</td></tr>{% endfor %}</tbody></table>{% endif %}
+    {% if others %}<h2 class="h3">Other schemes</h2><div class="scroll"><table class="ledger"><tbody>{% for sj in others %}<tr><td class="mono">{{ label(27, sj.scheme) }}</td><td class="mono">{{ sj.code }}</td><td>{{ sj.heading }}</td></tr>{% endfor %}</tbody></table></div>{% endif %}
     <div class="card" style="margin-top:18px">
-      <h3>Add subject</h3>
+      <h2 class="h3">Add subject</h2>
       <form method="post" action="/titles/{{ p.id }}/subjects" class="row c4" style="align-items:end">
         <div class="field"><label>Scheme</label><select name="scheme"><option value="93">Thema</option><option value="12">BIC 2.1</option><option value="10">BISAC</option><option value="24">Own categories</option><option value="20">Keywords</option></select></div>
         <div class="field"><label>Code</label><input type="text" name="code" placeholder="QRMP"></div>
@@ -198,7 +199,7 @@
     </div>
 
     {% elif tab == 'related' %}
-    <table class="ledger">
+    <div class="scroll"><table class="ledger">
       <thead><tr><th>Relation</th><th>ISBN</th><th>Title</th><th>Format</th><th></th></tr></thead>
       <tbody>
       {% for rp in p.related_products %}
@@ -210,12 +211,12 @@
         <td><form method="post" action="/titles/{{ p.id }}/related" class="inline"><input type="hidden" name="related_id" value="{{ rp.id }}"><button class="btn danger sm">remove</button></form></td></tr>
       {% endfor %}
       </tbody>
-    </table>
+    </table></div>
     <div class="card" style="margin-top:18px">
-      <h3>Link a related product</h3>
+      <h2 class="h3">Link a related product</h2>
       <form method="post" action="/titles/{{ p.id }}/related" class="row c4" style="align-items:end">
         <div class="field"><label>ISBN-13</label><input type="text" name="isbn13" required></div>
-        <div class="field"><label>Relation</label><select name="relation">{% for code in ['06','13','27','03','05','23','22','01'] %}<option value="{{ code }}">{{ code }} — {{ label(51, code) }}</option>{% endfor %}</select></div>
+        <div class="field"><label>Relation</label><select name="relation">{% for code in ['06','13','27','03','05','23','22','01'] %}<option value="{{ code }}">{{ code }}: {{ label(51, code) }}</option>{% endfor %}</select></div>
         <div class="check"><input type="checkbox" name="reciprocal" id="rec" value="1" checked><label for="rec" style="margin:0">Also link back from the other title</label></div>
         <div><button class="btn primary sm">Link</button></div>
       </form>
@@ -223,9 +224,9 @@
 
     {% elif tab == 'history' %}
     {% if p.changes %}
-    <table class="ledger"><thead><tr><th>When</th><th>Field</th><th>From</th><th>To</th><th>By</th></tr></thead><tbody>
+    <div class="scroll"><table class="ledger"><thead><tr><th>When</th><th>Field</th><th>From</th><th>To</th><th>By</th></tr></thead><tbody>
     {% for c in p.changes %}<tr><td class="small" style="white-space:nowrap">{{ c.changed_at.strftime('%d %b %Y %H:%M') }}</td><td class="mono">{{ c.field }}</td><td class="small muted">{{ (c.old_value or '')[:120] }}</td><td class="small">{{ (c.new_value or '')[:120] }}</td><td class="small muted">{{ c.changed_by }}</td></tr>{% endfor %}
-    </tbody></table>
+    </tbody></table></div>
     {% else %}<div class="empty">No edits recorded yet for this title.</div>{% endif %}
     {% endif %}
   </section>

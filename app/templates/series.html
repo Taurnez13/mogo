@@ -1,8 +1,10 @@
 {% extends "base.html" %}
-{% block title %}Series — Taurnez{% endblock %}
+{% block title %}Series | Taurnez{% endblock %}
 {% block content %}
 <h1>Series <span class="muted" style="font-size:18px">{{ rows|length }}</span></h1>
-<table class="ledger"><thead><tr><th>Series</th><th>Titles</th><th>Type</th></tr></thead><tbody>
+{% if rows %}
+<div class="scroll"><table class="ledger"><thead><tr><th>Series</th><th>Titles</th><th>Type</th></tr></thead><tbody>
 {% for s, n in rows %}<tr><td><a class="t" href="/titles?series_id={{ s.id }}">{{ s.title }}</a></td><td>{{ n }}</td><td class="small muted">{{ label(148, s.collection_type) }}</td></tr>{% endfor %}
-</tbody></table>
+</tbody></table></div>
+{% else %}<div class="empty">No series yet. Add one from the Series section on a title page.</div>{% endif %}
 {% endblock %}

@@ -620,7 +620,7 @@ def export_run(request: Request, db: Session = Depends(get_session), mode: str =
         for p in prods:
             p.last_exported_at = now
     db.commit()
-    flash(request, f"Exported {len(prods)} products to {fname}" + (" — schema valid." if not errs else f" — {len(errs)} validation errors."),
+    flash(request, f"Exported {len(prods)} products to {fname}" + (". Schema valid." if not errs else f". {len(errs)} validation errors."),
           "ok" if not errs else "warn")
     return RedirectResponse("/export", status_code=303)
 

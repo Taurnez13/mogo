@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Titles — Taurnez{% endblock %}
+{% block title %}Titles | Taurnez{% endblock %}
 {% block content %}
 <div class="topbar">
   <h1>Titles <span class="muted" style="font-size:18px">{{ total }}</span></h1>
@@ -42,7 +42,7 @@
 
 {% if rows %}
 {% set sortbase = '/titles?q=' ~ q ~ '&form=' ~ form ~ '&status=' ~ status ~ '&imprint=' ~ imprint ~ '&missing=' ~ missing ~ ('&series_id=' ~ series_id if series_id else '') ~ ('&contributor_id=' ~ contributor_id if contributor_id else '') %}
-<table class="ledger">
+<div class="scroll"><table class="ledger">
   <thead><tr>
     <th></th>
     <th><a href="{{ sortbase }}&sort=title">Title</a></th>
@@ -57,18 +57,18 @@
   {% for p in rows %}
     {% set cov = p.main_cover %}
     <tr>
-      <td><a href="/titles/{{ p.id }}">{% if cov %}<img class="thumb" loading="lazy" src="{{ '/media/' ~ cov.local_path if cov.local_path else cov.remote_url }}" alt="">{% else %}<span class="thumb none">no cover</span>{% endif %}</a></td>
+      <td><a href="/titles/{{ p.id }}">{% if cov %}<img class="thumb" width="34" height="48" loading="lazy" src="{{ '/media/' ~ cov.local_path if cov.local_path else cov.remote_url }}" alt="">{% else %}<span class="thumb none">no cover</span>{% endif %}</a></td>
       <td><a class="t" href="/titles/{{ p.id }}">{{ p.title_prefix ~ ' ' if p.title_prefix }}{{ p.title_without_prefix }}</a>{% if p.subtitle %}<div class="sub">{{ p.subtitle }}</div>{% endif %}</td>
       <td class="small">{% for c in p.contributors[:3] %}{{ c.contributor.display_name }}{% if c.role != 'A01' %} <span class="muted">({{ label(17, c.role)|lower }})</span>{% endif %}{{ ', ' if not loop.last }}{% endfor %}{% if p.contributors|length > 3 %} …{% endif %}</td>
-      <td class="mono">{{ p.isbn13 or '—' }}</td>
+      <td class="mono">{{ p.isbn13 or 'not set' }}</td>
       <td class="small">{{ label(150, p.product_form) }}</td>
-      <td class="small">{{ p.publication_date.strftime('%b %Y') if p.publication_date else '—' }}</td>
+      <td class="small">{{ p.publication_date.strftime('%b %Y') if p.publication_date else 'not set' }}</td>
       <td><span class="status {{ status_class.get(p.publishing_status, '') }}">{{ label(64, p.publishing_status) }}</span></td>
       <td class="num">{{ p.rrp_gbp|money(cur) }}</td>
     </tr>
   {% endfor %}
   </tbody>
-</table>
+</table></div>
 <div class="pager">
   {% if page > 1 %}<a class="btn quiet sm" href="{{ sortbase }}&sort={{ sort }}&page={{ page - 1 }}">← Previous</a>{% endif %}
   <span>Page {{ page }} of {{ pages }}</span>

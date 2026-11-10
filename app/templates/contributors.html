@@ -1,13 +1,15 @@
 {% extends "base.html" %}
-{% block title %}Contributors — Taurnez{% endblock %}
+{% block title %}Contributors | Taurnez{% endblock %}
 {% block content %}
 <div class="topbar"><h1>Contributors <span class="muted" style="font-size:18px">{{ rows|length }}</span></h1></div>
 <form method="get" class="filters" style="grid-template-columns: 2fr auto"><div><label>Search</label><input type="search" name="q" value="{{ q }}"></div><div><button class="btn">Search</button></div></form>
-<table class="ledger"><thead><tr><th>ID</th><th>Name</th><th>Type</th><th>Titles</th><th>ISNI</th><th>Bio</th></tr></thead><tbody>
+{% if rows %}
+<div class="scroll"><table class="ledger"><thead><tr><th>ID</th><th>Name</th><th>Type</th><th>Titles</th><th>ISNI</th><th>Bio</th></tr></thead><tbody>
 {% for c, n in rows %}
 <tr><td class="mono muted">{{ c.id }}</td><td><a class="t" href="/contributors/{{ c.id }}">{{ c.person_name_inverted or c.display_name }}</a></td>
 <td class="small">{{ 'Corporate' if c.is_corporate else 'Person' }}</td><td><a href="/titles?contributor_id={{ c.id }}">{{ n }}</a></td>
 <td class="mono small">{{ c.isni or '' }}</td><td class="small muted">{{ ((c.biographical_note or '')|striptags)[:100] }}</td></tr>
 {% endfor %}
-</tbody></table>
+</tbody></table></div>
+{% else %}<div class="empty">{% if q %}No contributors match "{{ q }}".{% else %}No contributors yet. They are created when you add one to a title or import ONIX.{% endif %}</div>{% endif %}
 {% endblock %}
