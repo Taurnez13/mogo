@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Taurnez{% endblock %}</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <p class="brand">Taur<span>·</span>nez</p>
+    <div class="brand-sub">{{ org_name or "Title metadata &amp; ONIX" }}</div>
+    {% set path = request.url.path %}
+    <nav class="nav">
+      <a href="/" class="{{ 'on' if path == '/' }}">Overview</a>
+      <a href="/titles" class="{{ 'on' if path.startswith('/titles') }}">Titles</a>
+      <a href="/contributors" class="{{ 'on' if path.startswith('/contributors') }}">Contributors</a>
+      <a href="/series" class="{{ 'on' if path.startswith('/series') }}">Series</a>
+      <div class="group">Feeds</div>
+      <a href="/export" class="{{ 'on' if path.startswith('/export') }}">ONIX export</a>
+      <a href="/import" class="{{ 'on' if path.startswith('/import') }}">ONIX import</a>
+      <a href="/sync" class="{{ 'on' if path.startswith('/sync') }}">Cin7 &amp; Shopify</a>
+      <div class="group">System</div>
+      <a href="/settings" class="{{ 'on' if path.startswith('/settings') }}">Settings</a>
+      <a href="/api/docs">API</a>
+      {% if user %}<div class="group">{{ user }}</div><a href="/logout">Sign out</a>{% endif %}
+    </nav>
+  </aside>
+  <main class="main">
+    {% if flash %}<div class="flash {{ flash.kind }}">{{ flash.msg }}</div>{% endif %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Sign in — Taurnez{% endblock %}
+{% block content %}
+<div style="max-width:380px;margin:60px auto">
+  <h1>Sign in</h1>
+  {% if error %}<div class="flash error">{{ error }}</div>{% endif %}
+  <form method="post">
+    <input type="hidden" name="next" value="{{ next }}">
+    <div class="field"><label>Username</label><input type="text" name="username" autofocus required autocomplete="username"></div>
+    <div class="field"><label>Password</label><input type="password" name="password" required autocomplete="current-password"></div>
+    <button class="btn primary">Sign in</button>
+  </form>
+</div>
+{% endblock %}

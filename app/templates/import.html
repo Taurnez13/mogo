@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}ONIX import — Taurnez
+<h2>Spreadsheet (CSV) import</h2>
+<p class="help">Coming from a spreadsheet? <a href="/import/template.csv">Download the template</a>, fill it in (one row per ISBN; unknown columns are ignored) and upload it. Rows whose ISBN already exists are updated.</p>
+<form method="post" action="/import/csv" enctype="multipart/form-data" style="max-width:520px">
+  <div class="field"><label>CSV file</label><input type="file" name="file" accept=".csv,text/csv" required></div>
+  <button class="btn">Import CSV</button>
+</form>
+<p class="help">Columns: isbn13, title, subtitle, product_form, publication_date, rrp, standard_rated, pages, height_mm, width_mm, weight_g, imprint, series, series_number, contributors (<code>Jane Smith|A01; John Doe|B06</code>), description, short_description, thema, bic, bisac, keywords, status, language, cover_url.</p>
+{% endblock %}
+{% block content %}
+<h1>ONIX import</h1>
+<p class="help">Load an ONIX 3.0 file (short or reference tags). Records are matched on RecordReference: existing titles are updated, new ones created. Use this to migrate from your current title-management system (Stison, Firebrand, Consonance, Nielsen Title Editor all export ONIX), or to take in a partner publisher's feed.</p>
+<form method="post" enctype="multipart/form-data" style="max-width:520px">
+  <div class="field"><label>ONIX file (.xml)</label><input type="file" name="file" accept=".xml,application/xml,text/xml" required></div>
+  <button class="btn primary">Import</button>
+</form>
+
+<h2>Spreadsheet (CSV) import</h2>
+<p class="help">Coming from a spreadsheet? <a href="/import/template.csv">Download the template</a>, fill it in (one row per ISBN; unknown columns are ignored) and upload it. Rows whose ISBN already exists are updated.</p>
+<form method="post" action="/import/csv" enctype="multipart/form-data" style="max-width:520px">
+  <div class="field"><label>CSV file</label><input type="file" name="file" accept=".csv,text/csv" required></div>
+  <button class="btn">Import CSV</button>
+</form>
+<p class="help">Columns: isbn13, title, subtitle, product_form, publication_date, rrp, standard_rated, pages, height_mm, width_mm, weight_g, imprint, series, series_number, contributors (<code>Jane Smith|A01; John Doe|B06</code>), description, short_description, thema, bic, bisac, keywords, status, language, cover_url.</p>
+{% endblock %}

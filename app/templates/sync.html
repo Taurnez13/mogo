@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Cin7 & Shopify — Taurnez{% endblock %}
+{% block content %}
+<h1>Cin7 Core &amp; Shopify</h1>
+<p class="help">Titles are matched to Cin7 products and Shopify variants by <b>barcode = ISBN-13</b> (falling back to SKU). <i>Pull</i> reads the remote record and stock/price into a snapshot shown on each title. <i>Push</i> sends title, description and RRP out; it runs as a dry run unless you untick the box, and new Shopify products are created as drafts.</p>
+<div class="cols">
+  <div class="card">
+    <div class="head"><h3>Cin7 Core</h3><span class="small {{ 'muted' if not cin7_ready }}">{{ 'credentials set' if cin7_ready else 'no credentials — see Settings' }}</span></div>
+    <p class="small">{{ linked.get('cin7', 0) }} of {{ total }} titles linked.</p>
+    <div class="actions">
+      <form method="post" action="/sync/cin7/pull"><button class="btn" {{ 'disabled' if not cin7_ready }}>Pull from Cin7</button></form>
+      <form method="post" action="/sync/cin7/push" class="actions"><div class="check"><input type="checkbox" name="dry_run" id="c7d" value="1" checked><label for="c7d" style="margin:0">dry run</label></div><button class="btn quiet" {{ 'disabled' if not cin7_ready }}>Push to Cin7</button></form>
+    </div>
+  </div>
+  <div class="card">
+    <div class="head"><h3>Shopify</h3><span class="small {{ 'muted' if not shopify_ready }}">{{ 'credentials set' if shopify_ready else 'no credentials — see Settings' }}</span></div>
+    <p class="small">{{ linked.get('shopify', 0) }} of {{ total }} titles linked.</p>
+    <div class="actions">
+      <form method="post" action="/sync/shopify/pull"><button class="btn" {{ 'disabled' if not shopify_ready }}>Pull from Shopify</button></form>
+      <form method="post" action="/sync/shopify/push" class="actions"><div class="check"><input type="checkbox" name="dry_run" id="shd" value="1" checked><label for="shd" style="margin:0">dry run</label></div><button class="btn quiet" {{ 'disabled' if not shopify_ready }}>Push to Shopify</button></form>
+    </div>
+  </div>
+</div>
+<h2>Sync log</h2>
+{% if logs %}
+<table class="ledger"><thead><tr><th>When</th><th>System</th><th>Direction</th><th>Result</th></tr></thead><tbody>
+{% for l in logs %}<tr><td class="small" style="white-space:nowrap">{{ l.run_at.strftime('%d %b %H:%M') }}</td><td>{{ l.system }}</td><td>{{ l.direction }}</td><td class="small {{ '' if l.ok else 'status withdrawn' }}">{{ l.summary }}</td></tr>{% endfor %}
+</tbody></table>
+{% else %}<div class="empty">Nothing synced yet.</div>{% endif %}
+{% endblock %}

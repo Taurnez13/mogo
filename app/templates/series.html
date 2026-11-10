@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}Series — Taurnez{% endblock %}
+{% block content %}
+<h1>Series <span class="muted" style="font-size:18px">{{ rows|length }}</span></h1>
+<table class="ledger"><thead><tr><th>Series</th><th>Titles</th><th>Type</th></tr></thead><tbody>
+{% for s, n in rows %}<tr><td><a class="t" href="/titles?series_id={{ s.id }}">{{ s.title }}</a></td><td>{{ n }}</td><td class="small muted">{{ label(148, s.collection_type) }}</td></tr>{% endfor %}
+</tbody></table>
+{% endblock %}

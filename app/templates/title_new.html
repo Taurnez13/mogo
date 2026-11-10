@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Add a title — Taurnez{% endblock %}
+{% block content %}
+<h1>Add a title</h1>
+<p class="help">Just the essentials to create the record. Everything else — description, contributors, subjects, cover, related formats — is added on the title page.</p>
+<form method="post" style="max-width:720px">
+  <div class="row c2">
+    <div class="field"><label>ISBN-13</label><input type="text" name="isbn13" required placeholder="9781784690000" inputmode="numeric"></div>
+    <div class="field"><label>Format</label><select name="product_form">{% for code in ['BC','BB','ED','BG','BF','BE','PD','SA','PC','PK'] %}<option value="{{ code }}">{{ code }} — {{ label(150, code) }}</option>{% endfor %}</select></div>
+  </div>
+  <div class="field"><label>Title</label><input type="text" name="title" required></div>
+  <div class="field"><label>Subtitle</label><input type="text" name="subtitle"></div>
+  <div class="row c3">
+    <div class="field"><label>Publication date</label><input type="date" name="publication_date"></div>
+    <div class="field"><label>RRP ({{ settings.currency }}, inc. tax)</label><input type="text" name="rrp" inputmode="decimal" placeholder="4.95"></div>
+    <div class="field"><label>Status</label><select name="publishing_status"><option value="02">Forthcoming</option><option value="04">Active</option></select></div>
+  </div>
+  <div class="check field"><input type="checkbox" name="vat_standard" id="vat" value="1"><label for="vat" style="margin:0">Taxable at standard rate ({{ settings.tax_standard_rate }}%) — e.g. non-book items or mixed packs</label></div>
+  <p class="help">Defaults applied: imprint {{ settings.default_imprint }}, publisher {{ settings.default_publisher }}, {{ label(74, settings.default_language) }}, general adult audience, worldwide exclusive rights. Books use the reduced/zero tax rate; tick the box for standard-rated items.</p>
+  <button class="btn primary">Create title</button>
+</form>
+{% endblock %}

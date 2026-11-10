@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}ONIX export — Taurnez{% endblock %}
+{% block content %}
+<h1>ONIX export</h1>
+<div class="cols">
+<form method="post">
+  <div class="row c2">
+    <div class="field"><label>Scope</label><select name="mode"><option value="full">Full catalogue</option><option value="delta">Changed since last export ({{ pending }})</option></select></div>
+    <div class="field"><label>Tag style</label><select name="tag_style"><option value="reference">Reference tags (Nielsen, most recipients)</option><option value="short">Short tags (as Stison sent)</option></select></div>
+  </div>
+  <div class="field"><label>Limit to formats <span class="muted">(ONIX codes, space-separated; blank = all)</span></label><input type="text" name="forms" placeholder="BC BB ED"></div>
+  <div class="check field"><input type="checkbox" name="mark_exported" id="mk" value="1" checked><label for="mk" style="margin:0">Mark these records as exported (resets the delta)</label></div>
+  <div class="actions"><button class="btn primary">Generate ONIX 3.0</button><a class="btn quiet" href="/export/titles.csv">Download titles as CSV</a></div>
+  <p class="help" style="margin-top:14px">Every export is validated against the EDItEUR ONIX 3.0 schema before it is saved. Sender: <b>{{ settings.sender_name }}</b>{% if settings.contact_email %}, {{ settings.contact_email }}{% endif %} — change in Settings.
+  {% if not settings.media_base_url %}<br><b>Cover URLs</b> still point at the host they were imported from. Set a media base URL in Settings once this app is hosted so recipients fetch jackets from you.{% endif %}</p>
+</form>
+<section>
+  <h2>Previous exports</h2>
+  {% if runs %}
+  <table class="ledger"><thead><tr><th>When</th><th>Scope</th><th>Products</th><th>Schema</th><th></th></tr></thead><tbody>
+  {% for r in runs %}<tr><td class="small">{{ r.run_at.strftime('%d %b %Y %H:%M') }}</td><td class="small">{{ r.mode }}</td><td>{{ r.product_count }}</td>
+  <td class="small">{% if r.valid %}<span class="status active">valid</span>{% else %}<details><summary class="status withdrawn">errors</summary><pre class="xml">{{ r.validation_errors }}</pre></details>{% endif %}</td>
+  <td><a class="btn quiet sm" href="/export/download/{{ r.filename }}">Download</a></td></tr>{% endfor %}
+  </tbody></table>
+  {% else %}<div class="empty">No exports yet.</div>{% endif %}
+</section>
+</div>
+{% endblock %}

@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Titles — Taurnez{% endblock %}
+{% block content %}
+<div class="topbar">
+  <h1>Titles <span class="muted" style="font-size:18px">{{ total }}</span></h1>
+  <a class="btn primary" href="/titles/new">Add a title</a>
+</div>
+
+<form method="get" class="filters">
+  <div><label>Search title, ISBN or author</label><input type="search" name="q" value="{{ q }}" placeholder="title, part of an ISBN, or contributor name"></div>
+  <div><label>Format</label>
+    <select name="form"><option value="">All</option>
+      {% for code, n in forms %}<option value="{{ code }}" {{ 'selected' if code == form }}>{{ label(150, code) }} ({{ n }})</option>{% endfor %}
+    </select></div>
+  <div><label>Status</label>
+    <select name="status"><option value="">All</option>
+      {% for code, n in statuses %}<option value="{{ code }}" {{ 'selected' if code == status }}>{{ label(64, code) }} ({{ n }})</option>{% endfor %}
+    </select></div>
+  <div><label>Imprint</label>
+    <select name="imprint"><option value="">All</option>
+      {% for i in imprints %}<option value="{{ i }}" {{ 'selected' if i == imprint }}>{{ i }}</option>{% endfor %}
+    </select></div>
+  <div><label>Series</label>
+    <select name="series_id"><option value="">All</option>
+      {% for s in series %}<option value="{{ s.id }}" {{ 'selected' if s.id == series_id }}>{{ s.title }}</option>{% endfor %}
+    </select></div>
+  <div><button class="btn">Filter</button></div>
+  <input type="hidden" name="missing" value="{{ missing }}">
+  <input type="hidden" name="sort" value="{{ sort }}">
+</form>
+
+<div class="chips">
+  {% set base = '/titles?q=' ~ q ~ '&form=' ~ form ~ '&status=' ~ status ~ '&imprint=' ~ imprint %}
+  <a class="chip {{ 'on' if not missing }}" href="{{ base }}">All</a>
+  <a class="chip {{ 'on' if missing == 'cover' }}" href="{{ base }}&missing=cover">No cover</a>
+  <a class="chip {{ 'on' if missing == 'thema' }}" href="{{ base }}&missing=thema">No Thema</a>
+  <a class="chip {{ 'on' if missing == 'description' }}" href="{{ base }}&missing=description">No description</a>
+  <a class="chip {{ 'on' if missing == 'price' }}" href="{{ base }}&missing=price">No price</a>
+  <a class="chip {{ 'on' if missing == 'unexported' }}" href="{{ base }}&missing=unexported">Changed since export</a>
+  {% if contributor_id %}<a class="chip on" href="{{ base }}">Contributor #{{ contributor_id }} ×</a>{% endif %}
+</div>
+
+{% if rows %}
+{% set sortbase = '/titles?q=' ~ q ~ '&form=' ~ form ~ '&status=' ~ status ~ '&imprint=' ~ imprint ~ '&missing=' ~ missing ~ ('&series_id=' ~ series_id if series_id else '') ~ ('&contributor_id=' ~ contributor_id if contributor_id else '') %}
+<table class="ledger">
+  <thead><tr>
+    <th></th>
+    <th><a href="{{ sortbase }}&sort=title">Title</a></th>
+    <th>Contributors</th>
+    <th><a href="{{ sortbase }}&sort=isbn">ISBN</a></th>
+    <th>Format</th>
+    <th><a href="{{ sortbase }}&sort=date">Published</a></th>
+    <th>Status</th>
+    <th style="text-align:right"><a href="{{ sortbase }}&sort=price">RRP</a></th>
+  </tr></thead>
+  <tbody>
+  {% for p in rows %}
+    {% set cov = p.main_cover %}
+    <tr>
+      <td><a href="/titles/{{ p.id }}">{% if cov %}<img class="thumb" loading="lazy" src="{{ '/media/' ~ cov.local_path if cov.local_path else cov.remote_url }}" alt="">{% else %}<span class="thumb none">no cover</span>{% endif %}</a></td>
+      <td><a class="t" href="/titles/{{ p.id }}">{{ p.title_prefix ~ ' ' if p.title_prefix }}{{ p.title_without_prefix }}</a>{% if p.subtitle %}<div class="sub">{{ p.subtitle }}</div>{% endif %}</td>
+      <td class="small">{% for c in p.contributors[:3] %}{{ c.contributor.display_name }}{% if c.role != 'A01' %} <span class="muted">({{ label(17, c.role)|lower }})</span>{% endif %}{{ ', ' if not loop.last }}{% endfor %}{% if p.contributors|length > 3 %} …{% endif %}</td>
+      <td class="mono">{{ p.isbn13 or '—' }}</td>
+      <td class="small">{{ label(150, p.product_form) }}</td>
+      <td class="small">{{ p.publication_date.strftime('%b %Y') if p.publication_date else '—' }}</td>
+      <td><span class="status {{ status_class.get(p.publishing_status, '') }}">{{ label(64, p.publishing_status) }}</span></td>
+      <td class="num">{{ p.rrp_gbp|money(cur) }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+<div class="pager">
+  {% if page > 1 %}<a class="btn quiet sm" href="{{ sortbase }}&sort={{ sort }}&page={{ page - 1 }}">← Previous</a>{% endif %}
+  <span>Page {{ page }} of {{ pages }}</span>
+  {% if page < pages %}<a class="btn quiet sm" href="{{ sortbase }}&sort={{ sort }}&page={{ page + 1 }}">Next →</a>{% endif %}
+</div>
+{% else %}
+<div class="empty">No titles match. Clear the filters or <a href="/titles/new">add a title</a>.</div>
+{% endif %}
+{% endblock %}

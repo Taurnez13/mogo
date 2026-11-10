@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Overview — Taurnez{% endblock %}
+{% block content %}
+<div class="topbar">
+  <h1>Catalogue overview</h1>
+  <div class="actions">
+    <a class="btn primary" href="/titles/new">Add a title</a>
+    <a class="btn quiet" href="/export">Export ONIX</a>
+  </div>
+</div>
+
+<div class="stat-row">
+  <div class="stat"><div class="n">{{ stats.total }}</div><div class="l">titles</div></div>
+  <div class="stat"><div class="n">{{ stats.by_status.get('04', 0) }}</div><div class="l"><a href="/titles?status=04">active</a></div></div>
+  <div class="stat"><div class="n">{{ stats.by_status.get('02', 0) }}</div><div class="l"><a href="/titles?status=02">forthcoming</a></div></div>
+  <div class="stat"><div class="n">{{ stats.by_status.get('07', 0) }}</div><div class="l"><a href="/titles?status=07">out of print</a></div></div>
+  <div class="stat"><div class="n">{{ stats.contributors }}</div><div class="l"><a href="/contributors">contributors</a></div></div>
+  <div class="stat"><div class="n">{{ stats.series }}</div><div class="l"><a href="/series">series</a></div></div>
+</div>
+
+<div class="cols">
+  <section>
+    <h2>Metadata gaps</h2>
+    <p class="help">Each is a filter on the title list. Recipients such as Nielsen score records on completeness, so these are the quickest wins.</p>
+    <ul class="plain">
+      <li><a href="/titles?missing=cover">No front cover</a><b>{{ stats.gaps.cover }}</b></li>
+      <li><a href="/titles?missing=thema">No Thema subject</a><b>{{ stats.gaps.thema }}</b></li>
+      <li><a href="/titles?missing=description">No description</a><b>{{ stats.gaps.description }}</b></li>
+      <li><a href="/titles?missing=price">No GBP price</a><b>{{ stats.gaps.price }}</b></li>
+      <li><a href="/titles?missing=contributor">No contributor</a><b>{{ stats.gaps.contributor }}</b></li>
+      <li><a href="/titles?missing=unexported">Changed since last export</a><b>{{ stats.gaps.unexported }}</b></li>
+    </ul>
+
+    <h2>By format</h2>
+    <ul class="plain">
+      {% for code, n in stats.by_form.items() %}
+      <li><a href="/titles?form={{ code }}">{{ label(150, code) }} <span class="muted mono">{{ code }}</span></a><b>{{ n }}</b></li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section>
+    <h2>Forthcoming</h2>
+    {% if stats.forthcoming %}
+    <ul class="plain">
+      {% for p in stats.forthcoming %}
+      <li><a href="/titles/{{ p.id }}" class="serif">{{ p.title }}</a><span class="muted small">{{ p.publication_date or '—' }}</span></li>
+      {% endfor %}
+    </ul>
+    {% else %}<div class="empty">No forthcoming titles. <a href="/titles/new">Add one</a>.</div>{% endif %}
+
+    <h2>Recent changes</h2>
+    {% if stats.recent %}
+    <ul class="plain small">
+      {% for c in stats.recent %}
+      <li><span><a href="/titles/{{ c.product_id }}">#{{ c.product_id }}</a> {{ c.field }} → <i>{{ (c.new_value or '—')[:60] }}</i></span><span class="muted">{{ c.changed_at.strftime('%d %b %H:%M') }}</span></li>
+      {% endfor %}
+    </ul>
+    {% else %}<div class="empty">Edits made here will be listed, so you can see what the next ONIX delta will carry.</div>{% endif %}
+
+    <h2>Last export</h2>
+    {% if stats.last_export %}
+    <p class="small">{{ stats.last_export.run_at.strftime('%d %b %Y %H:%M') }} — {{ stats.last_export.product_count }} products, {{ stats.last_export.mode }},
+      {{ 'schema valid' if stats.last_export.valid else 'has validation errors' }}.
+      <a href="/export/download/{{ stats.last_export.filename }}">Download</a></p>
+    {% else %}<p class="small muted">No export yet.</p>{% endif %}
+  </section>
+</div>
+{% endblock %}

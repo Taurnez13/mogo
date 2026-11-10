@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}{{ c.display_name }} — Taurnez{% endblock %}
+{% block content %}
+<p class="small"><a href="/contributors">Contributors</a> / #{{ c.id }}</p>
+<h1>{{ c.display_name }}</h1>
+<div class="cols">
+<form method="post">
+  <div class="check field"><input type="checkbox" name="is_corporate" id="corp" value="1" {{ 'checked' if c.is_corporate }}><label for="corp" style="margin:0">Corporate body</label></div>
+  <div class="field"><label>Corporate name</label><input type="text" name="corporate_name" value="{{ c.corporate_name or '' }}"></div>
+  <div class="row c2">
+    <div class="field"><label>Person name (display)</label><input type="text" name="person_name" value="{{ c.person_name or '' }}"></div>
+    <div class="field"><label>Inverted (Surname, Forenames)</label><input type="text" name="person_name_inverted" value="{{ c.person_name_inverted or '' }}"></div>
+  </div>
+  <div class="row c4">
+    <div class="field"><label>Titles before</label><input type="text" name="titles_before_names" value="{{ c.titles_before_names or '' }}" placeholder="Fr"></div>
+    <div class="field"><label>Forenames</label><input type="text" name="names_before_key" value="{{ c.names_before_key or '' }}"></div>
+    <div class="field"><label>Key name</label><input type="text" name="key_names" value="{{ c.key_names or '' }}"></div>
+    <div class="field"><label>Letters after</label><input type="text" name="letters_after_names" value="{{ c.letters_after_names or '' }}" placeholder="OP"></div>
+  </div>
+  <div class="row c2">
+    <div class="field"><label>ISNI</label><input type="text" name="isni" value="{{ c.isni or '' }}" class="mono"></div>
+    <div class="field"><label>Website</label><input type="url" name="website" value="{{ c.website or '' }}"></div>
+  </div>
+  <div class="field"><label>Biographical note</label><textarea name="biographical_note">{{ c.biographical_note or '' }}</textarea></div>
+  <button class="btn primary">Save</button>
+  {% if c.legacy_id %}<p class="small muted">Imported contributor ID: <code>{{ c.legacy_id }}</code></p>{% endif %}
+</form>
+<section>
+  <h2>Titles ({{ c.products|length }})</h2>
+  <ul class="plain">{% for pc in c.products %}<li><a href="/titles/{{ pc.product.id }}" class="serif">{{ pc.product.title }}</a><span class="muted small">{{ label(17, pc.role) }}</span></li>{% endfor %}</ul>
+</section>
+</div>
+{% endblock %}

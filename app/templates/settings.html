@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Settings — Taurnez{% endblock %}
+{% block content %}
+<h1>Settings</h1>
+<div class="cols">
+<form method="post">
+  <h2>ONIX sender</h2>
+  <div class="field"><label>Sender name</label><input type="text" name="sender_name" value="{{ settings.sender_name }}"></div>
+  <div class="row c2">
+    <div class="field"><label>Contact name</label><input type="text" name="contact_name" value="{{ settings.contact_name }}"></div>
+    <div class="field"><label>Contact email</label><input type="text" name="contact_email" value="{{ settings.contact_email }}"></div>
+  </div>
+  <div class="field"><label>Message note</label><input type="text" name="message_note" value="{{ settings.message_note }}"></div>
+  <div class="field"><label>Media base URL <span class="muted">(public address of this app, e.g. https://books.example.org)</span></label><input type="url" name="media_base_url" value="{{ settings.media_base_url }}"></div>
+  <h2>Defaults for new titles</h2>
+  <div class="row c4">
+    <div class="field"><label>Currency</label><input type="text" name="currency" value="{{ settings.currency }}" maxlength="3" class="mono"></div>
+    <div class="field"><label>Country of publication</label><input type="text" name="default_country" value="{{ settings.default_country }}" maxlength="2" class="mono"></div>
+    <div class="field"><label>Language (ONIX code)</label><input type="text" name="default_language" value="{{ settings.default_language }}" maxlength="3" class="mono"></div>
+    <div class="field"><label>Standard tax rate %</label><input type="text" name="tax_standard_rate" value="{{ settings.tax_standard_rate }}" inputmode="decimal"></div>
+  </div>
+  <div class="row c2">
+    <div class="field"><label>Tax rate on books %</label><input type="text" name="tax_book_rate" value="{{ settings.tax_book_rate }}" inputmode="decimal"></div>
+    <div class="field"><label>Tax rate code for books <span class="muted">(ONIX List 62: Z zero, R reduced, S standard)</span></label><input type="text" name="tax_book_code" value="{{ settings.tax_book_code }}" maxlength="1" class="mono"></div>
+  </div>
+  <div class="row c3">
+    <div class="field"><label>Imprint</label><input type="text" name="default_imprint" value="{{ settings.default_imprint }}"></div>
+    <div class="field"><label>Publisher</label><input type="text" name="default_publisher" value="{{ settings.default_publisher }}"></div>
+    <div class="field"><label>Supplier</label><input type="text" name="default_supplier" value="{{ settings.default_supplier }}"></div>
+  </div>
+  <h2>Cin7 Core</h2>
+  <div class="row c2">
+    <div class="field"><label>Account ID</label><input type="text" name="cin7_account_id" value="{{ settings.cin7_account_id }}" class="mono"></div>
+    <div class="field"><label>Application key</label><input type="password" name="cin7_api_key" value="{{ '••••••••' if settings.cin7_api_key }}" class="mono"></div>
+  </div>
+  <p class="help">Cin7 Core → Integrations → API → add an application. Copy the Account ID and Application Key.</p>
+  <h2>Shopify</h2>
+  <div class="row c2">
+    <div class="field"><label>Shop domain</label><input type="text" name="shopify_shop" value="{{ settings.shopify_shop }}" placeholder="your-shop.myshopify.com"></div>
+    <div class="field"><label>Admin API access token</label><input type="password" name="shopify_token" value="{{ '••••••••' if settings.shopify_token }}" class="mono"></div>
+  </div>
+  <p class="help">Shopify admin → Settings → Apps and sales channels → Develop apps → create an app with <code>read_products</code>, <code>write_products</code>, <code>read_inventory</code> → install → reveal the Admin API access token.</p>
+  <h2>Access</h2>
+  <div class="row c2">
+    <div class="field"><label>API key <span class="muted">(blank = API open to anyone who can reach the server)</span></label><input type="text" name="api_key" value="{{ settings.api_key }}" class="mono"></div>
+  </div>
+  <button class="btn primary">Save settings</button>
+</form>
+<section>
+  <h2>Cover images</h2>
+  <p class="small">{{ covers_local }} of {{ covers_total }} front covers are stored locally. The rest are still referenced from the host they were imported from and will break if that host goes away.</p>
+  <form method="post" action="/media/harvest"><input type="hidden" name="limit" value="5000"><button class="btn">Download all remaining covers</button></form>
+  <p class="help">Downloads run inside this request; a thousand images takes a few minutes. Re-running only fetches what is missing.</p>
+
+  <h2>Users</h2>
+  <table class="ledger"><tbody>
+  {% for u in users %}<tr><td>{{ u.username }}</td><td class="small muted">{{ u.role }}</td><td style="width:90px">{% if u.username != user %}<form method="post" action="/users/{{ u.id }}/delete" class="inline"><button class="btn danger sm">remove</button></form>{% endif %}</td></tr>{% endfor %}
+  </tbody></table>
+  <form method="post" action="/users" class="row c3" style="align-items:end;margin-top:10px">
+    <div class="field"><label>Username</label><input type="text" name="username" required autocomplete="off"></div>
+    <div class="field"><label>Password</label><input type="password" name="password" required minlength="8" autocomplete="new-password"></div>
+    <div class="field" style="display:flex;gap:8px;align-items:end"><div style="flex:1"><label>Role</label><select name="role"><option value="editor">editor</option><option value="admin">admin</option></select></div><button class="btn quiet">Add</button></div>
+  </form>
+</section>
+</div>
+{% endblock %}
